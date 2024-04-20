@@ -7,14 +7,13 @@ import os
 import pprint
 
 import logging
-import timeit
-
-import numpy as np
 
 import torch
-import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.optim
+from hydra import initialize, compose
+from omegaconf import DictConfig
+from torch.utils.data import DataLoader
 
 import models
 from configs import config
@@ -44,8 +43,14 @@ def parse_args():
     return args
 
 
+def powerlines_config() -> DictConfig:
+    with initialize(version_base=None, config_path="../configs"):
+        return compose(config_name="powerlines")
+
+
 def main():
     args = parse_args()
+    config_powerlines = powerlines_config()
 
     if args.seed > 0:
         import random
@@ -65,22 +70,9 @@ def main():
     cudnn.enabled = config.CUDNN.ENABLED
  
     batch_size = config.TRAIN.BATCH_SIZE_PER_GPU
-    # prepare data
-    crop_size = (config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
 
-    train_dataset = eval('datasets.'+config.DATASET.DATASET)(
-        root=config.DATASET.ROOT,
-        list_path=config.DATASET.TRAIN_SET,
-        num_classes=config.DATASET.NUM_CLASSES,
-        multi_scale=config.TRAIN.MULTI_SCALE,
-        flip=config.TRAIN.FLIP,
-        ignore_label=config.TRAIN.IGNORE_LABEL,
-        base_size=config.TRAIN.BASE_SIZE,
-        crop_size=crop_size,
-        scale_factor=config.TRAIN.SCALE_FACTOR
-    )
-
-    train_dataloader = torch.utils.data.DataLoader(
+    train_dataset = factory.train_dataset(config_powerlines)
+    train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=config.TRAIN.SHUFFLE,
@@ -89,24 +81,13 @@ def main():
         drop_last=True
     )
 
-    test_size = (config.TEST.IMAGE_SIZE[1], config.TEST.IMAGE_SIZE[0])
-    val_dataset = eval('datasets.'+config.DATASET.DATASET)(
-        root=config.DATASET.ROOT,
-        list_path=config.DATASET.TEST_SET,
-        num_classes=config.DATASET.NUM_CLASSES,
-        multi_scale=False,
-        flip=False,
-        ignore_label=config.TRAIN.IGNORE_LABEL,
-        base_size=config.TEST.BASE_SIZE,
-        crop_size=test_size
-    )
-
-    val_dataloader = torch.utils.data.DataLoader(
-        val_dataset,
+    val_dataloader = DataLoader(
+        factory.val_dataset(config_powerlines),
         batch_size=config.TEST.BATCH_SIZE_PER_GPU,
         shuffle=False,
         num_workers=config.WORKERS,
-        pin_memory=False)
+        pin_memory=False
+    )
 
     # criterion
     if config.LOSS.USE_OHEM:
