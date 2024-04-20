@@ -11,6 +11,7 @@ from PIL import Image
 import torch
 from .base_dataset import BaseDataset
 
+
 class Cityscapes(BaseDataset):
     def __init__(self, 
                  root, 
@@ -113,11 +114,9 @@ class Cityscapes(BaseDataset):
 
         return image.copy(), label.copy(), edge.copy(), np.array(size), name
 
-    
     def single_scale_inference(self, config, model, image):
         pred = self.inference(config, model, image)
         return pred
-
 
     def save_pred(self, preds, sv_path, name):
         preds = np.asarray(np.argmax(preds.cpu(), axis=1), dtype=np.uint8)
@@ -125,6 +124,3 @@ class Cityscapes(BaseDataset):
             pred = self.convert_label(preds[i], inverse=True)
             save_img = Image.fromarray(pred)
             save_img.save(os.path.join(sv_path, name[i]+'.png'))
-
-        
-        

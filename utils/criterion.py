@@ -119,9 +119,9 @@ def weighted_bce(bd_pre, target):
     return loss
 
 
-class BondaryLoss(nn.Module):
+class BoundaryLoss(nn.Module):
     def __init__(self, coeff_bce = 20.0):
-        super(BondaryLoss, self).__init__()
+        super(BoundaryLoss, self).__init__()
         self.coeff_bce = coeff_bce
         
     def forward(self, bd_pre, bd_gt):
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     a[:,5,:] = 1
     pre = torch.randn(2,1,16,16)
     
-    Loss_fc = BondaryLoss()
+    Loss_fc = BoundaryLoss()
     loss = Loss_fc(pre, a.to(torch.uint8))
 
         

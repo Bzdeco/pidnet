@@ -11,6 +11,7 @@ from torch.utils import data
 y_k_size = 6
 x_k_size = 6
 
+
 class BaseDataset(data.Dataset):
     def __init__(self,
                  ignore_label=255,
@@ -102,10 +103,7 @@ class BaseDataset(data.Dataset):
 
         return image, label, edge
 
-
-    def gen_sample(self, image, label,
-                   multi_scale=True, is_flip=True, edge_pad=True, edge_size=4, city=True):
-        
+    def gen_sample(self, image, label, multi_scale=True, is_flip=True, edge_pad=True, edge_size=4, city=True):
         edge = cv2.Canny(label, 0.1, 0.2)
         kernel = np.ones((edge_size, edge_size), np.uint8)
         if edge_pad:
@@ -120,7 +118,6 @@ class BaseDataset(data.Dataset):
 
         image = self.input_transform(image, city=city)
         label = self.label_transform(label)
-        
 
         image = image.transpose((2, 0, 1))
 
@@ -132,7 +129,6 @@ class BaseDataset(data.Dataset):
 
         return image, label, edge
 
-
     def inference(self, config, model, image):
         size = image.size()
         pred = model(image)
@@ -140,12 +136,7 @@ class BaseDataset(data.Dataset):
         if config.MODEL.NUM_OUTPUTS > 1:
             pred = pred[config.TEST.OUTPUT_INDEX]
         
-        
-        pred = F.interpolate(
-            input=pred, size=size[-2:],
-            mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS
-        )
-        
-        
+        pred = F.interpolate(input=pred, size=size[-2:], mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS)
+
         return pred.exp()
 

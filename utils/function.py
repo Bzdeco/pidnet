@@ -7,6 +7,8 @@ import os
 import time
 
 import numpy as np
+from torch import nn
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import torch
@@ -17,32 +19,27 @@ from utils.utils import get_confusion_matrix
 from utils.utils import adjust_learning_rate
 
 
-
-def train(config, epoch, num_epoch, epoch_iters, base_lr,
-          num_iters, trainloader, optimizer, model, writer_dict):
+def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters, dataloader, optimizer, model):
     # Training
     model.train()
 
     batch_time = AverageMeter()
     ave_loss = AverageMeter()
-    ave_acc  = AverageMeter()
+    ave_acc = AverageMeter()
     avg_sem_loss = AverageMeter()
     avg_bce_loss = AverageMeter()
     tic = time.time()
     cur_iters = epoch*epoch_iters
-    writer = writer_dict['writer']
-    global_steps = writer_dict['train_global_steps']
 
-    for i_iter, batch in enumerate(trainloader, 0):
+    for i_iter, batch in enumerate(dataloader):
         images, labels, bd_gts, _, _ = batch
         images = images.cuda()
         labels = labels.long().cuda()
         bd_gts = bd_gts.float().cuda()
         
-
         losses, _, acc, loss_list = model(images, labels, bd_gts)
         loss = losses.mean()
-        acc  = acc.mean()
+        acc = acc.mean()
 
         model.zero_grad()
         loss.backward()
@@ -71,17 +68,18 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr,
                       ave_acc.average(), avg_sem_loss.average(), avg_bce_loss.average(),ave_loss.average()-avg_sem_loss.average()-avg_bce_loss.average())
             logging.info(msg)
 
-    writer.add_scalar('train_loss', ave_loss.average(), global_steps)
-    writer_dict['train_global_steps'] = global_steps + 1
+    # writer.add_scalar('train_loss', ave_loss.average(), global_steps)
+    # writer_dict['train_global_steps'] = global_steps + 1
 
-def validate(config, testloader, model, writer_dict):
+
+def validate(config, dataloader: DataLoader, model: nn.Module):
     model.eval()
     ave_loss = AverageMeter()
     nums = config.MODEL.NUM_OUTPUTS
     confusion_matrix = np.zeros(
         (config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES, nums))
     with torch.no_grad():
-        for idx, batch in enumerate(testloader):
+        for idx, batch in enumerate(dataloader):
             image, label, bd_gts, _, _ = batch
             size = label.size()
             image = image.cuda()
@@ -120,11 +118,9 @@ def validate(config, testloader, model, writer_dict):
         
         logging.info('{} {} {}'.format(i, IoU_array, mean_IoU))
 
-    writer = writer_dict['writer']
-    global_steps = writer_dict['valid_global_steps']
-    writer.add_scalar('valid_loss', ave_loss.average(), global_steps)
-    writer.add_scalar('valid_mIoU', mean_IoU, global_steps)
-    writer_dict['valid_global_steps'] = global_steps + 1
+    # writer.add_scalar('valid_loss', ave_loss.average(), global_steps)
+    # writer.add_scalar('valid_mIoU', mean_IoU, global_steps)
+    # writer_dict['valid_global_steps'] = global_steps + 1
     return ave_loss.average(), mean_IoU, IoU_array
 
 

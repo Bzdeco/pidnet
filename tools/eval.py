@@ -44,8 +44,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    logger, final_output_dir, _ = create_logger(
-        config, args.cfg, 'test')
+    logger, final_output_dir, _ = create_logger(config, args.cfg, 'test')
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
@@ -56,7 +55,7 @@ def main():
     cudnn.enabled = config.CUDNN.ENABLED
 
     # build model
-    model = model = models.pidnet.get_seg_model(config, imgnet_pretrained=True)
+    model = models.pidnet.get_seg_model(config)
 
     if config.TEST.MODEL_FILE:
         model_state_file = config.TEST.MODEL_FILE
