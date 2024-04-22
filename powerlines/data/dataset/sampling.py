@@ -7,8 +7,8 @@ import torch
 
 from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig, SamplingConfig
-from powerlines.data.utils import load_filtered_filepaths, sample_patch_center, load_annotations, train_augmentations, \
-    evaluation_augmentations, load_parameters_for_sampling, load_complete_frame
+from powerlines.data.utils import load_filtered_filepaths, sample_patch_center, load_annotations, \
+    load_parameters_for_sampling, load_complete_frame, downsample_labels
 from powerlines.utils import parallelize
 
 
@@ -37,7 +37,6 @@ class TrainCablesDetectionDataset(BaseDataset):
         self.num_frames = num_frames if num_frames is not None else len(self.filepaths)
 
         # FIXME: Augmentations are implemented in the base dataset, add color jittering?
-        # self.augmentations = train_augmentations()
 
         self._loading_data = self._frames_loading_data()
         self.cache = parallelize(
@@ -67,7 +66,7 @@ class TrainCablesDetectionDataset(BaseDataset):
     def __getitem__(self, idx: int):
         frame_id = self.sampling.frame_idx_for_sample(idx)
         frame = load_complete_frame(self.data_source, self.loading, self.cache[frame_id])
-        size = frame["image"].shape  # FIXME: channel first or last?
+        size = frame["image"].shape
         name = str(frame["timestamp"])
 
         if self._should_sample_positive_sample(frame):
@@ -91,7 +90,6 @@ class TrainCablesDetectionDataset(BaseDataset):
             sample["edge"] = edge
 
         return sample
-
 
     def _extract_patch(self, input: Optional[np.ndarray], y: int, x: int) -> Optional[np.ndarray]:
         if input is None:

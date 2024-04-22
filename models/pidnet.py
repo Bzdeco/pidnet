@@ -13,22 +13,20 @@ bn_mom = 0.1
 algc = False
 
 
-
 class PIDNet(nn.Module):
-
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, downsample=True):
         super(PIDNet, self).__init__()
         self.augment = augment
         
         # I Branch
         self.conv1 =  nn.Sequential(
-                          nn.Conv2d(3,planes,kernel_size=3, stride=2, padding=1),
-                          BatchNorm2d(planes, momentum=bn_mom),
-                          nn.ReLU(inplace=True),
-                          nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
-                          BatchNorm2d(planes, momentum=bn_mom),
-                          nn.ReLU(inplace=True),
-                      )
+            nn.Conv2d(3,planes,kernel_size=3, stride=2, padding=1),
+            BatchNorm2d(planes, momentum=bn_mom),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+            BatchNorm2d(planes, momentum=bn_mom),
+            nn.ReLU(inplace=True),
+        )
 
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_layer(BasicBlock, planes, planes, m)
@@ -39,14 +37,14 @@ class PIDNet(nn.Module):
         
         # P Branch
         self.compression3 = nn.Sequential(
-                                          nn.Conv2d(planes * 4, planes * 2, kernel_size=1, bias=False),
-                                          BatchNorm2d(planes * 2, momentum=bn_mom),
-                                          )
+            nn.Conv2d(planes * 4, planes * 2, kernel_size=1, bias=False),
+            BatchNorm2d(planes * 2, momentum=bn_mom),
+        )
 
         self.compression4 = nn.Sequential(
-                                          nn.Conv2d(planes * 8, planes * 2, kernel_size=1, bias=False),
-                                          BatchNorm2d(planes * 2, momentum=bn_mom),
-                                          )
+            nn.Conv2d(planes * 8, planes * 2, kernel_size=1, bias=False),
+            BatchNorm2d(planes * 2, momentum=bn_mom),
+        )
         self.pag3 = PagFM(planes * 2, planes)
         self.pag4 = PagFM(planes * 2, planes)
 
@@ -59,26 +57,26 @@ class PIDNet(nn.Module):
             self.layer3_d = self._make_single_layer(BasicBlock, planes * 2, planes)
             self.layer4_d = self._make_layer(Bottleneck, planes, planes, 1)
             self.diff3 = nn.Sequential(
-                                        nn.Conv2d(planes * 4, planes, kernel_size=3, padding=1, bias=False),
-                                        BatchNorm2d(planes, momentum=bn_mom),
-                                        )
+                nn.Conv2d(planes * 4, planes, kernel_size=3, padding=1, bias=False),
+                BatchNorm2d(planes, momentum=bn_mom),
+            )
             self.diff4 = nn.Sequential(
-                                     nn.Conv2d(planes * 8, planes * 2, kernel_size=3, padding=1, bias=False),
-                                     BatchNorm2d(planes * 2, momentum=bn_mom),
-                                     )
+                nn.Conv2d(planes * 8, planes * 2, kernel_size=3, padding=1, bias=False),
+                BatchNorm2d(planes * 2, momentum=bn_mom),
+            )
             self.spp = PAPPM(planes * 16, ppm_planes, planes * 4)
             self.dfm = Light_Bag(planes * 4, planes * 4)
         else:
             self.layer3_d = self._make_single_layer(BasicBlock, planes * 2, planes * 2)
             self.layer4_d = self._make_single_layer(BasicBlock, planes * 2, planes * 2)
             self.diff3 = nn.Sequential(
-                                        nn.Conv2d(planes * 4, planes * 2, kernel_size=3, padding=1, bias=False),
-                                        BatchNorm2d(planes * 2, momentum=bn_mom),
-                                        )
+                nn.Conv2d(planes * 4, planes * 2, kernel_size=3, padding=1, bias=False),
+                BatchNorm2d(planes * 2, momentum=bn_mom),
+            )
             self.diff4 = nn.Sequential(
-                                     nn.Conv2d(planes * 8, planes * 2, kernel_size=3, padding=1, bias=False),
-                                     BatchNorm2d(planes * 2, momentum=bn_mom),
-                                     )
+                nn.Conv2d(planes * 8, planes * 2, kernel_size=3, padding=1, bias=False),
+                BatchNorm2d(planes * 2, momentum=bn_mom),
+            )
             self.spp = DAPPM(planes * 16, ppm_planes, planes * 4)
             self.dfm = Bag(planes * 4, planes * 4)
             
@@ -91,14 +89,19 @@ class PIDNet(nn.Module):
 
         self.final_layer = segmenthead(planes * 4, head_planes, num_classes)
 
+        # Downsampling to common resolution
+        self.downsample = downsample
+        self.downsample_p = nn.Conv2d(num_classes, num_classes, kernel_size=2, stride=2)
+        self.downsample_d = nn.Conv2d(1, 1, kernel_size=2, stride=2)
+        self.downsample_main = nn.Conv2d(num_classes, num_classes, kernel_size=2, stride=2)
 
+        # Layers initialization
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
-
 
     def _make_layer(self, block, inplanes, planes, blocks, stride=1):
         downsample = None
@@ -176,9 +179,20 @@ class PIDNet(nn.Module):
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
             x_extra_d = self.seghead_d(temp_d)
-            return [x_extra_p, x_, x_extra_d]
+
+            if self.downsample:
+                return [
+                    self.downsample_p(x_extra_p),
+                    self.downsample_main(x_),
+                    self.downsample_d(x_extra_d)
+                ]
+            else:
+                return [x_extra_p, x_, x_extra_d]
         else:
-            return x_
+            if self.downsample:
+                return self.downsample_main(x_)
+            else:
+                return x_
 
 
 def get_seg_model(cfg):

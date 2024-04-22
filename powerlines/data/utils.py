@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Tuple, Any, Union
 
 import numpy as np
 import torch
+from torch import nn
 
 from powerlines.data.annotations import ImageAnnotations, num_cable_samples_in_frame
 from powerlines.data.config import DataSourceConfig, SamplingConfig, LoadingConfig, _filter_excluded_filepaths, \
@@ -298,3 +299,31 @@ def cut_into_complete_set_of_patches(
                 shifts.append(torch.as_tensor([x, y]))
 
     return patches, shifts
+
+
+_downsampler = nn.MaxPool2d(kernel_size=2, stride=2).cuda()
+
+
+def downsample_labels(labels: torch.Tensor, grid_size: int, adjust_to_divisible: bool) -> torch.Tensor:
+    if adjust_to_divisible:
+        input_labels = pad_tensor_to_match_target_size(labels, grid_size, padding_value=0)
+    else:
+        input_labels = labels
+
+    batch_size, height, width = input_labels.size()
+    half_grid_size = grid_size // 2
+
+    x_steps = width // grid_size
+    base_xs = torch.linspace(half_grid_size - 1, half_grid_size - 1 + (x_steps - 1) * grid_size, x_steps)
+    xs = base_xs.repeat_interleave(2)
+    xs[1::2] += 1
+    y_steps = height // grid_size
+    base_ys = torch.linspace(half_grid_size - 1, half_grid_size - 1 + (y_steps - 1) * grid_size, y_steps)
+    ys = base_ys.repeat_interleave(2)
+    ys[1::2] += 1
+    xs_indices, ys_indices = torch.meshgrid(xs, ys, indexing="xy")
+
+    grid_centers = input_labels[:, ys_indices.long().flatten(), xs_indices.long().flatten()].reshape(
+        (batch_size, height // grid_size * 2, width // grid_size * 2)
+    )
+    return _downsampler(grid_centers.unsqueeze(1)).squeeze(1)

@@ -73,13 +73,11 @@ def main():
     cudnn.benchmark = config.CUDNN.BENCHMARK
     cudnn.deterministic = config.CUDNN.DETERMINISTIC
     cudnn.enabled = config.CUDNN.ENABLED
- 
-    batch_size = config.TRAIN.BATCH_SIZE_PER_GPU
 
     train_dataset = factory.train_dataset(config_powerlines)
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=batch_size,
+        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU,
         shuffle=config.TRAIN.SHUFFLE,
         num_workers=config.WORKERS,
         pin_memory=False,
@@ -136,14 +134,7 @@ def main():
     real_end = 120+1 if 'camvid' in config.DATASET.TRAIN_SET else end_epoch
     
     for epoch in range(last_epoch, real_end):
-
-        current_trainloader = train_dataloader
-        if current_trainloader.sampler is not None and hasattr(current_trainloader.sampler, 'set_epoch'):
-            current_trainloader.sampler.set_epoch(epoch)
-
-        train(
-            config, epoch, config.TRAIN.END_EPOCH, epoch_iters, config.TRAIN.LR, num_iters, train_dataloader, optimizer, model
-        )
+        train(epoch, epoch_iters, config.TRAIN.LR, num_iters, train_dataloader, optimizer, model)
 
         if is_resumed == 1 or (epoch % 5 == 0 and epoch < real_end - 100) or (epoch >= real_end - 100):
             valid_loss, mean_IoU, IoU_array = validate(config, val_dataloader, model)
@@ -160,7 +151,7 @@ def main():
         logging.info(msg)
         logging.info(IoU_array)
 
-    save_checkpoint(epoch, output_folder, model, optimizer, "final_state.pt")
+    save_checkpoint(end_epoch, output_folder, model, optimizer, "final_state.pt")
 
 
 def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optimizer, filename: Optional[str] = None):

@@ -14,28 +14,28 @@ from tqdm import tqdm
 import torch
 from torch.nn import functional as F
 
+from powerlines.data.utils import downsample_labels
 from utils.utils import AverageMeter
 from utils.utils import get_confusion_matrix
 from utils.utils import adjust_learning_rate
 
 
-def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters, dataloader, optimizer, model):
-    # Training
+def train(epoch: int, epoch_iters: int, base_lr: float, num_iters: int, dataloader: DataLoader, optimizer, model):
     model.train()
 
-    batch_time = AverageMeter()
     ave_loss = AverageMeter()
     ave_acc = AverageMeter()
     avg_sem_loss = AverageMeter()
     avg_bce_loss = AverageMeter()
-    tic = time.time()
     cur_iters = epoch*epoch_iters
 
-    for i_iter, batch in enumerate(dataloader):
+    for i_iter, batch in enumerate(tqdm(dataloader, desc="Training")):
         images = batch["image"].cuda()
-        labels = batch["labels"].long().cuda()
         bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
-        
+
+        labels = batch["labels"].cuda()
+        labels = downsample_labels(labels.float(), grid_size=16, adjust_to_divisible=False).long()
+
         losses, _, acc, loss_list = model(images, labels, bd_gts)
         loss = losses.mean()
         acc = acc.mean()
@@ -44,28 +44,13 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters, dataloader,
         loss.backward()
         optimizer.step()
 
-        # measure elapsed time
-        batch_time.update(time.time() - tic)
-        tic = time.time()
-
         # update average loss
         ave_loss.update(loss.item())
         ave_acc.update(acc.item())
         avg_sem_loss.update(loss_list[0].mean().item())
         avg_bce_loss.update(loss_list[1].mean().item())
 
-        lr = adjust_learning_rate(optimizer,
-                                  base_lr,
-                                  num_iters,
-                                  i_iter+cur_iters)
-
-        if i_iter % config.PRINT_FREQ == 0:
-            msg = 'Epoch: [{}/{}] Iter:[{}/{}], Time: {:.2f}, ' \
-                  'lr: {}, Loss: {:.6f}, Acc:{:.6f}, Semantic loss: {:.6f}, BCE loss: {:.6f}, SB loss: {:.6f}' .format(
-                      epoch, num_epoch, i_iter, epoch_iters,
-                      batch_time.average(), [x['lr'] for x in optimizer.param_groups], ave_loss.average(),
-                      ave_acc.average(), avg_sem_loss.average(), avg_bce_loss.average(),ave_loss.average()-avg_sem_loss.average()-avg_bce_loss.average())
-            logging.info(msg)
+        lr = adjust_learning_rate(optimizer, base_lr, num_iters, i_iter+cur_iters)
 
     # writer.add_scalar('train_loss', ave_loss.average(), global_steps)
     # writer_dict['train_global_steps'] = global_steps + 1
@@ -73,26 +58,24 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters, dataloader,
 
 def validate(config, dataloader: DataLoader, model: nn.Module):
     model.eval()
+
     ave_loss = AverageMeter()
     nums = config.MODEL.NUM_OUTPUTS
-    confusion_matrix = np.zeros(
-        (config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES, nums))
+    confusion_matrix = np.zeros((config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES, nums))
+
     with torch.no_grad():
-        for idx, batch in enumerate(dataloader):
+        for idx, batch in enumerate(tqdm(dataloader, desc="Validating")):
             images = batch["image"].cuda()
-            labels = batch["labels"].long().cuda()
             bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
+
+            labels = batch["labels"].cuda()
+            labels = downsample_labels(labels.float(), grid_size=16, adjust_to_divisible=False).long()
             size = labels.size()
 
             losses, pred, _, _ = model(images, labels, bd_gts)
             if not isinstance(pred, (list, tuple)):
                 pred = [pred]
             for i, x in enumerate(pred):
-                x = F.interpolate(
-                    input=x, size=size[-2:],
-                    mode='bilinear', align_corners=config.MODEL.ALIGN_CORNERS
-                )
-
                 confusion_matrix[..., i] += get_confusion_matrix(
                     labels,
                     x,

@@ -44,13 +44,6 @@ class FullModel(nn.Module):
     def forward(self, inputs: torch.Tensor, labels: torch.Tensor, bd_gt: Optional[torch.Tensor], *args, **kwargs):
         outputs = self.model(inputs, *args, **kwargs)
 
-        # TODO: replace with downsampling target
-        h, w = labels.size(1), labels.size(2)
-        ph, pw = outputs[0].size(2), outputs[0].size(3)
-        if ph != h or pw != w:
-            for i in range(len(outputs)):
-                outputs[i] = F.interpolate(outputs[i], size=(h, w), mode="bilinear", align_corners=config.MODEL.ALIGN_CORNERS)
-
         acc = self.pixel_acc(outputs[-2], labels)
         loss_s = self.sem_seg_loss(outputs[:-1], labels)
         loss_b = self.bd_loss(outputs[-1], bd_gt) if bd_gt is not None else torch.tensor(0.0)
