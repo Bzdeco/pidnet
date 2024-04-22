@@ -35,8 +35,8 @@ TRAIN:
   END_EPOCH: 30  # num epochs
   RESUME: false
   OPTIMIZER: adam
-  LR: 0.001
-  WD: 0.0005
+  LR: 0.0001
+  WD: 0.0001
   FLIP: true
   MULTI_SCALE: true
   IGNORE_LABEL: 255
