@@ -150,11 +150,11 @@ class SegmentationMetrics:
 
         # CCQ metrics
         for prediction, target in zip(pred_probabilities, target_labels):
-            gt_distance = distance_transform((target_labels == 1).detach().cpu().numpy())
+            gt_distance = distance_transform((target == 1).detach().cpu().numpy())
             for idx, scoring_threshold in enumerate(self._scoring_thresholds):
                 conf_matrix = relaxed_confusion_matrix(
-                    (prediction < scoring_threshold).float().unsqueeze(0).numpy(),
-                    gt_distance[np.newaxis, :, :],
+                    (prediction < scoring_threshold).float().numpy(),
+                    gt_distance,
                     self._ccq_threshold,  # single threshold to recover binarized cables inside the metric computation
                     self._tolerance_region
                 )

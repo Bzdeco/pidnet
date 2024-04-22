@@ -42,7 +42,6 @@ class InferenceCablesDetectionDataset(BaseDataset):
 
         image = frame["image"]
         labels = frame["labels"]
-        # exclusion_zones_distance_mask = frame.get("exclusion_zones_distance_mask", None)
 
         image, labels, edge = self.generate_sample(
             image, labels, generate_edge=False, multi_scale=False, is_flip=False, edge_pad=False
