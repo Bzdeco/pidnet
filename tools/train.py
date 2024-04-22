@@ -7,12 +7,16 @@ import os
 import pprint
 
 import logging
+from pathlib import Path
+from typing import Optional
 
 import torch
 import torch.backends.cudnn as cudnn
 import torch.optim
 from hydra import initialize, compose
 from omegaconf import DictConfig
+from torch import nn
+from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
 import models
@@ -21,7 +25,7 @@ from configs import update_config
 from tools import factory
 from utils.criterion import CrossEntropy, OhemCrossEntropy, BoundaryLoss
 from utils.function import train, validate
-from utils.utils import create_logger, FullModel
+from utils.utils import create_logger, FullModel, checkpoint_folder, create_neptune_run, run_id
 
 
 def parse_args():
@@ -44,8 +48,8 @@ def parse_args():
 
 
 def powerlines_config() -> DictConfig:
-    with initialize(version_base=None, config_path="../configs"):
-        return compose(config_name="powerlines")
+    with initialize(version_base=None, config_path="../configs/powerlines"):
+        return compose(config_name="config")
 
 
 def main():
@@ -58,8 +62,9 @@ def main():
         random.seed(args.seed)
         torch.manual_seed(args.seed)        
 
-    logger, final_output_dir, tb_log_dir = create_logger(
-        config, args.cfg, 'train')
+    run = create_neptune_run(config_powerlines.name, resume=False, from_run_id=None)
+    output_folder = checkpoint_folder(config_powerlines, run_id(run))
+    logger, tb_log_dir = create_logger(args.cfg, output_folder, 'train')  # TODO: replace with neptune
 
     logger.info(pprint.pformat(args))
     logger.info(config)
@@ -91,14 +96,14 @@ def main():
 
     # criterion
     if config.LOSS.USE_OHEM:
-        sem_criterion = OhemCrossEntropy(
+        semantic_seg_criterion = OhemCrossEntropy(
             ignore_label=config.TRAIN.IGNORE_LABEL,
             thres=config.LOSS.OHEMTHRES,
             min_kept=config.LOSS.OHEMKEEP,
             weight=train_dataset.class_weights
         )
     else:
-        sem_criterion = CrossEntropy(
+        semantic_seg_criterion = CrossEntropy(
             ignore_label=config.TRAIN.IGNORE_LABEL,
             weight=train_dataset.class_weights
         )
@@ -106,7 +111,7 @@ def main():
     bd_criterion = BoundaryLoss()
 
     pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
-    model = FullModel(pidnet, sem_criterion, bd_criterion).cuda()
+    model = FullModel(pidnet, semantic_seg_criterion, bd_criterion).cuda()
     optimizer = factory.optimizer(config, model)
 
     epoch_iters = int(len(train_dataset) / config.TRAIN.BATCH_SIZE_PER_GPU)
@@ -115,7 +120,7 @@ def main():
     last_epoch = 0
     is_resumed = config.TRAIN.RESUME
     if config.TRAIN.RESUME:
-        model_state_file = os.path.join(final_output_dir, 'checkpoint.pth.tar')
+        model_state_file = os.path.join(output_folder, 'checkpoint.pth.tar')
         if os.path.isfile(model_state_file):
             checkpoint = torch.load(model_state_file, map_location={'cuda:0': 'cpu'})
             best_mIoU = checkpoint['best_mIoU']
@@ -145,22 +150,27 @@ def main():
         if is_resumed == 1:
             is_resumed = 0
 
-        torch.save({
-            'epoch': epoch+1,
-            'best_mIoU': best_mIoU,
-            'state_dict': model.module.state_dict(),
-            'optimizer': optimizer.state_dict(),
-        }, os.path.join(final_output_dir, f"{epoch:03d}.pt"))
+        save_checkpoint(epoch, output_folder, model, optimizer)
 
         if mean_IoU > best_mIoU:
             best_mIoU = mean_IoU
-            torch.save(model.module.state_dict(), os.path.join(final_output_dir, "best_miou.pt"))
+            save_checkpoint(epoch, output_folder, model, optimizer, "best_miou.pt")
+
         msg = 'Loss: {:.3f}, MeanIU: {: 4.4f}, Best_mIoU: {: 4.4f}'.format(valid_loss, mean_IoU, best_mIoU)
         logging.info(msg)
         logging.info(IoU_array)
 
-    torch.save(model.module.state_dict(), os.path.join(final_output_dir, 'final_state.pt'))
+    torch.save(model.module.state_dict(), os.path.join(output_folder, 'final_state.pt'))
     logger.info('Done')
+
+
+def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optimizer, filename: Optional[str] = None):
+    filename = filename or f"{epoch:03d}.pt"
+    torch.save({
+        "epoch": epoch + 1,
+        "state_dict": model.module.state_dict(),
+        "optimizer": optimizer.state_dict(),
+    }, folder / filename)
 
 
 if __name__ == '__main__':

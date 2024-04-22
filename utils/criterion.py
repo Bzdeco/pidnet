@@ -33,16 +33,12 @@ class CrossEntropy(nn.Module):
             return sum([w * self._forward(x, target) for (w, x) in zip(balance_weights, score)])
         elif len(score) == 1:
             return sb_weights * self._forward(score[0], target)
-        
         else:
             raise ValueError("lengths of prediction and target are not identical!")
 
-        
-
 
 class OhemCrossEntropy(nn.Module):
-    def __init__(self, ignore_label=-1, thres=0.7,
-                 min_kept=100000, weight=None):
+    def __init__(self, ignore_label=-1, thres=0.7, min_kept=100000, weight=None):
         super(OhemCrossEntropy, self).__init__()
         self.thresh = thres
         self.min_kept = max(1, min_kept)
@@ -54,14 +50,10 @@ class OhemCrossEntropy(nn.Module):
         )
 
     def _ce_forward(self, score, target):
-
-
         loss = self.criterion(score, target)
-
         return loss
 
     def _ohem_forward(self, score, target, **kwargs):
-
         pred = F.softmax(score, dim=1)
         pixel_losses = self.criterion(score, target).contiguous().view(-1)
         mask = target.contiguous().view(-1) != self.ignore_label
@@ -78,7 +70,6 @@ class OhemCrossEntropy(nn.Module):
         return pixel_losses.mean()
 
     def forward(self, score, target):
-        
         if not (isinstance(score, list) or isinstance(score, tuple)):
             score = [score]
 
@@ -94,7 +85,6 @@ class OhemCrossEntropy(nn.Module):
         
         elif len(score) == 1:
             return sb_weights * self._ohem_forward(score[0], target)
-        
         else:
             raise ValueError("lengths of prediction and target are not identical!")
 
@@ -130,7 +120,8 @@ class BoundaryLoss(nn.Module):
         loss = bce_loss
         
         return loss
-    
+
+
 if __name__ == '__main__':
     a = torch.zeros(2,64,64)
     a[:,5,:] = 1

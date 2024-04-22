@@ -44,7 +44,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    logger, final_output_dir, _ = create_logger(config, args.cfg, 'test')
+    logger, final_output_dir, _ = create_logger(args.cfg, 'test')
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))

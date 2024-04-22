@@ -8,23 +8,29 @@ from __future__ import print_function
 
 import os
 import logging
+import re
 import time
 from pathlib import Path
+from typing import Optional
 
+import neptune
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from neptune import Run
+from omegaconf import DictConfig
+
 from configs import config
 
 
 class FullModel(nn.Module):
-    def __init__(self, model, sem_loss, bd_loss):
+    def __init__(self, model, semantic_seg_loss, boundary_loss):
         super(FullModel, self).__init__()
         self.model = model
-        self.sem_loss = sem_loss
-        self.bd_loss = bd_loss
+        self.sem_seg_loss = semantic_seg_loss
+        self.bd_loss = boundary_loss
 
     def pixel_acc(self, pred, label):
         _, preds = torch.max(pred, dim=1)
@@ -36,7 +42,10 @@ class FullModel(nn.Module):
 
     def forward(self, inputs, labels, bd_gt, *args, **kwargs):
         outputs = self.model(inputs, *args, **kwargs)
+        for i, output in enumerate(outputs):
+            print(f"{i} output: {output.size()}")
 
+        # TODO: replace with downsampling target
         h, w = labels.size(1), labels.size(2)
         ph, pw = outputs[0].size(2), outputs[0].size(3)
         if ph != h or pw != w:
@@ -44,12 +53,14 @@ class FullModel(nn.Module):
                 outputs[i] = F.interpolate(outputs[i], size=(h, w), mode="bilinear", align_corners=config.MODEL.ALIGN_CORNERS)
 
         acc = self.pixel_acc(outputs[-2], labels)
-        loss_s = self.sem_loss(outputs[:-1], labels)
-        loss_b = self.bd_loss(outputs[-1], bd_gt)
+        loss_s = self.sem_seg_loss(outputs[:-1], labels)
+        loss_b = self.bd_loss(outputs[-1], bd_gt)  # TODO: do not use boundary loss
 
+        # Boundary-aware CE loss (TODO: do not use)
         filler = torch.ones_like(labels) * config.TRAIN.IGNORE_LABEL
         bd_label = torch.where(F.sigmoid(outputs[-1][:, 0, :, :]) > 0.8, labels, filler)
-        loss_sb = self.sem_loss(outputs[-2], bd_label)
+        loss_sb = self.sem_seg_loss(outputs[-2], bd_label)
+
         loss = loss_s + loss_b + loss_sb
 
         return torch.unsqueeze(loss, 0), outputs[:-1], acc, [loss_s, loss_b]
@@ -91,22 +102,47 @@ class AverageMeter(object):
         return self.avg
 
 
-def create_logger(cfg, cfg_name, phase='train'):
-    root_output_dir = Path(cfg.OUTPUT_DIR)
-    root_output_dir.mkdir(exist_ok=False)
+def checkpoint_folder(config: DictConfig, run_id: int) -> Path:
+    folder = Path(config.paths.checkpoints) / str(run_id)
+    folder.mkdir(exist_ok=False)
+    return folder
 
-    dataset = cfg.DATASET.DATASET
-    model = cfg.MODEL.NAME
+
+def create_neptune_run(name: str, resume: bool = False, from_run_id: Optional[int] = None) -> Run:
+    # Attach to the existing run if loading from checkpoint and resuming the run
+    with_id = f"POW-{from_run_id}" if from_run_id is not None and resume else None
+    run_name = name if with_id is None else None
+
+    return neptune.init_run(
+        project="jakubg/powerlines",
+        api_token=os.environ["NEPTUNE_API_TOKEN"],
+        with_id=with_id,
+        name=run_name,
+        mode="debug",  # TODO: async
+        capture_stdout=True,
+        capture_stderr=True,
+        capture_traceback=True,
+        capture_hardware_metrics=True,
+        flush_period=300,
+        source_files=[]  # do not log source code
+    )
+
+
+neptune_id_pattern = re.compile(r"\w+-(?P<id>\d+)")
+
+
+def run_id(run: neptune.Run) -> int:
+    neptune_id = run["sys/id"].fetch()
+    match = neptune_id_pattern.match(neptune_id)
+    return int(match.group("id"))
+
+
+def create_logger(cfg_name, output_folder: Path, phase='train'):
     cfg_name = os.path.basename(cfg_name).split('.')[0]
-
-    final_output_dir = root_output_dir / dataset / cfg_name
-
-    print('=> creating {}'.format(final_output_dir))
-    final_output_dir.mkdir(parents=True, exist_ok=True)
 
     time_str = time.strftime('%Y-%m-%d-%H-%M')
     log_file = '{}_{}_{}.log'.format(cfg_name, time_str, phase)
-    final_log_file = final_output_dir / log_file
+    final_log_file = output_folder / log_file
     head = '%(asctime)-15s %(message)s'
     logging.basicConfig(filename=str(final_log_file),
                         format=head)
@@ -115,12 +151,11 @@ def create_logger(cfg, cfg_name, phase='train'):
     console = logging.StreamHandler()
     logging.getLogger('').addHandler(console)
 
-    tensorboard_log_dir = Path(cfg.LOG_DIR) / dataset / model / \
-            (cfg_name + '_' + time_str)
+    tensorboard_log_dir = output_folder / (cfg_name + '_' + time_str)
     print('=> creating {}'.format(tensorboard_log_dir))
     tensorboard_log_dir.mkdir(parents=True, exist_ok=True)
 
-    return logger, str(final_output_dir), str(tensorboard_log_dir)
+    return logger, str(tensorboard_log_dir)
 
 
 def get_confusion_matrix(label, pred, size, num_class, ignore=-1):
