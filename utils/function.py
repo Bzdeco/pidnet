@@ -32,10 +32,9 @@ def train(config, epoch, num_epoch, epoch_iters, base_lr, num_iters, dataloader,
     cur_iters = epoch*epoch_iters
 
     for i_iter, batch in enumerate(dataloader):
-        images, labels, bd_gts, _, _ = batch
-        images = images.cuda()
-        labels = labels.long().cuda()
-        bd_gts = bd_gts.float().cuda()
+        images = batch["image"].cuda()
+        labels = batch["labels"].long().cuda()
+        bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
         
         losses, _, acc, loss_list = model(images, labels, bd_gts)
         loss = losses.mean()
@@ -80,13 +79,12 @@ def validate(config, dataloader: DataLoader, model: nn.Module):
         (config.DATASET.NUM_CLASSES, config.DATASET.NUM_CLASSES, nums))
     with torch.no_grad():
         for idx, batch in enumerate(dataloader):
-            image, label, bd_gts, _, _ = batch
-            size = label.size()
-            image = image.cuda()
-            label = label.long().cuda()
-            bd_gts = bd_gts.float().cuda()
+            images = batch["image"].cuda()
+            labels = batch["labels"].long().cuda()
+            bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
+            size = labels.size()
 
-            losses, pred, _, _ = model(image, label, bd_gts)
+            losses, pred, _, _ = model(images, labels, bd_gts)
             if not isinstance(pred, (list, tuple)):
                 pred = [pred]
             for i, x in enumerate(pred):
@@ -96,7 +94,7 @@ def validate(config, dataloader: DataLoader, model: nn.Module):
                 )
 
                 confusion_matrix[..., i] += get_confusion_matrix(
-                    label,
+                    labels,
                     x,
                     size,
                     config.DATASET.NUM_CLASSES,

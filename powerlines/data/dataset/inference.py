@@ -35,6 +35,7 @@ class InferenceCablesDetectionDataset(BaseDataset):
             "timestamp": annotation.frame_timestamp(),
             "annotation": annotation
         } for annotation in self.annotations.values()]
+        self.class_weights = torch.FloatTensor([1.0, 1.0]).cuda()   # TODO: compute class weights
 
     def __getitem__(self, frame_id: int):
         frame = load_complete_frame(self.data_source, self.loading, self.cache[frame_id])

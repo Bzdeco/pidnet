@@ -75,9 +75,9 @@ class OhemCrossEntropy(nn.Module):
 
         balance_weights = config.LOSS.BALANCE_WEIGHTS
         sb_weights = config.LOSS.SB_WEIGHTS
+
         if len(balance_weights) == len(score):
-            functions = [self._ce_forward] * \
-                (len(balance_weights) - 1) + [self._ohem_forward]
+            functions = [self._ce_forward] * (len(balance_weights) - 1) + [self._ohem_forward]
             return sum([
                 w * func(x, target)
                 for (w, x, func) in zip(balance_weights, score, functions)

@@ -12,6 +12,20 @@ y_k_size = 6
 x_k_size = 6
 
 
+def channel_last(image: np.ndarray) -> np.ndarray:
+    if image.shape[0] <= 4 and all(map(lambda dim: dim > 4, image.shape[1:])):
+        return np.transpose(image, (1, 2, 0))
+    else:
+        return image
+
+
+def channel_first(image: np.ndarray) -> np.ndarray:
+    if image.shape[-1] <=4 and all(map(lambda dim: dim > 4, image.shape[:-1])):
+        return np.transpose(image, (2, 0, 1))
+    else:
+        return image
+
+
 class BaseDataset(data.Dataset):
     def __init__(
         self,
@@ -72,20 +86,23 @@ class BaseDataset(data.Dataset):
         return image, label, edge
 
     def multi_scale_aug(self, image, label=None, edge=None, rand_scale=1.0, rand_crop=True):
-        long_size = np.int(self.base_size * rand_scale + 0.5)
+        long_size = int(self.base_size * rand_scale + 0.5)
+        image = channel_last(image)
         h, w = image.shape[:2]
+
         if h > w:
             new_h = long_size
-            new_w = np.int(w * long_size / h + 0.5)
+            new_w = int(w * long_size / h + 0.5)
         else:
             new_w = long_size
-            new_h = np.int(h * long_size / w + 0.5)
+            new_h = int(h * long_size / w + 0.5)
 
+        # Channel last for resizing: https://stackoverflow.com/a/69348858
         image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
         if label is not None:
-            label = cv2.resize(label, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+            label = cv2.resize(label.astype(int), (new_w, new_h), interpolation=cv2.INTER_NEAREST).astype(bool)
             if edge is not None:
-                edge = cv2.resize(edge, (new_w, new_h), interpolation=cv2.INTER_NEAREST)
+                edge = cv2.resize(edge.astype(int), (new_w, new_h), interpolation=cv2.INTER_NEAREST).astype(bool)
         else:
             return image
 
@@ -118,17 +135,16 @@ class BaseDataset(data.Dataset):
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
             image, label, edge = self.multi_scale_aug(image, label, edge, rand_scale=rand_scale)
 
-        image = self.input_transform(image)
+        image = channel_first(self.input_transform(image))
         label = self.label_transform(label)
 
-        print("image shape", image.shape)
-        image = image.transpose((2, 0, 1))  # FIXME: not necessary in our case?
-
+        # Horizontal flipping, copy to fix negative strides
         if is_flip:
             flip = np.random.choice(2) * 2 - 1
-            image = image[:, :, ::flip]
-            label = label[:, ::flip]
-            edge = edge[:, ::flip]
+            image = image[:, :, ::flip].copy()
+            label = label[:, ::flip].copy()
+            if edge is not None:
+                edge = edge[:, ::flip].copy()
 
         return image, label, edge
 

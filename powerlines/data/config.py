@@ -24,7 +24,7 @@ class DataSourceConfig:
 
     def __post_init__(self):
         self.inputs_folder = self.complete_frames_root_folder / "images"
-        self.distance_masks_folder = self.complete_frames_root_folder / "distance_masks"
+        self.distance_masks_folder = self.complete_frames_root_folder / "distance_masks" / "visible"
         self.exclusion_zones_distance_masks_folder = self.complete_frames_root_folder / "exclusion_zones_distance_masks"
         self.labels_folder = self.complete_frames_root_folder / "labels"
 

@@ -88,11 +88,17 @@ class CamVid(BaseDataset):
         color_map = np.array(color_map)
         label = self.color2label(color_map)
 
-        image, label, edge = self.generate_sample(image, label,
-                                                  self.multi_scale, self.flip, edge_pad=False,
-                                                  edge_size=self.bd_dilate_size, city=False)
+        image, label, edge = self.generate_sample(
+            image, label, self.multi_scale, self.flip, edge_pad=False, edge_size=self.bd_dilate_size
+        )
 
-        return image.copy(), label.copy(), edge.copy(), np.array(size), name
+        return {
+            "image": image,
+            "label": label,
+            "edge": edge,
+            "size": np.array(size),
+            "name": name
+        }
 
     def single_scale_inference(self, config, model, image):
         pred = self.inference(config, model, image)

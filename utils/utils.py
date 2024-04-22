@@ -26,11 +26,12 @@ from configs import config
 
 
 class FullModel(nn.Module):
-    def __init__(self, model, semantic_seg_loss, boundary_loss):
+    def __init__(self, model, semantic_seg_loss, boundary_loss, use_boundary_aware_ce: bool = False):
         super(FullModel, self).__init__()
         self.model = model
         self.sem_seg_loss = semantic_seg_loss
         self.bd_loss = boundary_loss
+        self._use_boundary_aware_ce = use_boundary_aware_ce
 
     def pixel_acc(self, pred, label):
         _, preds = torch.max(pred, dim=1)
@@ -40,10 +41,8 @@ class FullModel(nn.Module):
         acc = acc_sum.float() / (pixel_sum.float() + 1e-10)
         return acc
 
-    def forward(self, inputs, labels, bd_gt, *args, **kwargs):
+    def forward(self, inputs: torch.Tensor, labels: torch.Tensor, bd_gt: Optional[torch.Tensor], *args, **kwargs):
         outputs = self.model(inputs, *args, **kwargs)
-        for i, output in enumerate(outputs):
-            print(f"{i} output: {output.size()}")
 
         # TODO: replace with downsampling target
         h, w = labels.size(1), labels.size(2)
@@ -54,12 +53,15 @@ class FullModel(nn.Module):
 
         acc = self.pixel_acc(outputs[-2], labels)
         loss_s = self.sem_seg_loss(outputs[:-1], labels)
-        loss_b = self.bd_loss(outputs[-1], bd_gt)  # TODO: do not use boundary loss
+        loss_b = self.bd_loss(outputs[-1], bd_gt) if bd_gt is not None else torch.tensor(0.0)
 
-        # Boundary-aware CE loss (TODO: do not use)
-        filler = torch.ones_like(labels) * config.TRAIN.IGNORE_LABEL
-        bd_label = torch.where(F.sigmoid(outputs[-1][:, 0, :, :]) > 0.8, labels, filler)
-        loss_sb = self.sem_seg_loss(outputs[-2], bd_label)
+        # Boundary-aware CE loss
+        if self._use_boundary_aware_ce:
+            filler = torch.ones_like(labels) * config.TRAIN.IGNORE_LABEL
+            bd_label = torch.where(F.sigmoid(outputs[-1][:, 0, :, :]) > 0.8, labels, filler)
+            loss_sb = self.sem_seg_loss(outputs[-2], bd_label)
+        else:
+            loss_sb = torch.tensor(0.0)
 
         loss = loss_s + loss_b + loss_sb
 
@@ -104,7 +106,7 @@ class AverageMeter(object):
 
 def checkpoint_folder(config: DictConfig, run_id: int) -> Path:
     folder = Path(config.paths.checkpoints) / str(run_id)
-    folder.mkdir(exist_ok=False)
+    folder.mkdir(exist_ok=True)
     return folder
 
 

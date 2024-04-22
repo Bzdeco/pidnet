@@ -3,6 +3,7 @@ import random
 from typing import List, Dict, Any, Optional
 
 import numpy as np
+import torch
 
 from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig, SamplingConfig
@@ -46,6 +47,7 @@ class TrainCablesDetectionDataset(BaseDataset):
             f"Loading {data_source.data_source_subset} frames for configuration",
             use_threads=True
         )
+        self.class_weights = torch.FloatTensor([1.0, 1.0]).cuda()   # TODO: compute class weights
         self.sampling.configure_sampling(self.cache)
 
     def _frames_loading_data(self) -> List[Dict[str, Any]]:
@@ -79,8 +81,17 @@ class TrainCablesDetectionDataset(BaseDataset):
 
         image, labels, edge = self.generate_sample(image, labels, generate_edge=False)
 
-        # passing None to edges, it should not be used
-        return image, labels, edge, np.array(size), name
+        sample = {
+            "image": image,
+            "labels": labels,
+            "size": np.array(size),
+            "name": name
+        }
+        if edge is not None:
+            sample["edge"] = edge
+
+        return sample
+
 
     def _extract_patch(self, input: Optional[np.ndarray], y: int, x: int) -> Optional[np.ndarray]:
         if input is None:
