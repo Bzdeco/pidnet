@@ -11,8 +11,8 @@ data:
     folds_select: null
     parallel: []
   size:
-    train: 5
-    val: 2
+    train: null
+    val: null
 
 optimizer:
   adjust_lr: false

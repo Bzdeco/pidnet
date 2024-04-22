@@ -4,11 +4,12 @@ from typing import List, Dict, Any, Optional
 
 import numpy as np
 import torch
+import torchvision.transforms.v2 as transforms
 
 from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig, SamplingConfig
 from powerlines.data.utils import load_filtered_filepaths, sample_patch_center, load_annotations, \
-    load_parameters_for_sampling, load_complete_frame, downsample_labels
+    load_parameters_for_sampling, load_complete_frame
 from powerlines.utils import parallelize
 
 
@@ -36,7 +37,9 @@ class TrainCablesDetectionDataset(BaseDataset):
         self.annotations = load_annotations(data_source)
         self.num_frames = num_frames if num_frames is not None else len(self.filepaths)
 
-        # FIXME: Augmentations are implemented in the base dataset, add color jittering?
+        self.color_jitter = transforms.ColorJitter(
+            brightness=[0.8, 1.2], contrast=[0.8, 1.2], saturation=[0.8, 1.2], hue=[-0.2, 0.2]
+        )
 
         self._loading_data = self._frames_loading_data()
         self.cache = parallelize(
@@ -46,7 +49,7 @@ class TrainCablesDetectionDataset(BaseDataset):
             f"Loading {data_source.data_source_subset} frames for configuration",
             use_threads=True
         )
-        self.class_weights = torch.FloatTensor([1.0, 1.0]).cuda()   # TODO: compute class weights
+        self.class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
         self.sampling.configure_sampling(self.cache)
 
     def _frames_loading_data(self) -> List[Dict[str, Any]]:
@@ -90,6 +93,20 @@ class TrainCablesDetectionDataset(BaseDataset):
             sample["edge"] = edge
 
         return sample
+
+    def input_transform(self, image: np.ndarray):
+        # Rescale
+        image = image.astype(np.float32)
+        image = image / 255.0
+
+        # Color jitter
+        image = self.color_jitter(torch.from_numpy(image)).numpy()
+
+        # Normalize
+        image -= self.mean
+        image /= self.std
+
+        return image
 
     def _extract_patch(self, input: Optional[np.ndarray], y: int, x: int) -> Optional[np.ndarray]:
         if input is None:

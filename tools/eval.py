@@ -13,23 +13,21 @@ import timeit
 import numpy as np
 
 import torch
-import torch.nn as nn
 import torch.backends.cudnn as cudnn
 
-import _init_paths
 import models
-import datasets
 from configs import config
 from configs import update_config
 from utils.function import testval, test
 from utils.utils import create_logger
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train segmentation network')
     
     parser.add_argument('--cfg',
                         help='experiment configure file name',
-                        default="experiments/cityscapes/pidnet_small_cityscapes.yaml",
+                        default="configs/powerlines/pidnet_small_powerlines.yaml",
                         type=str)
     parser.add_argument('opts',
                         help="Modify config options using the command-line",
@@ -41,6 +39,7 @@ def parse_args():
 
     return args
 
+
 def main():
     args = parse_args()
 
@@ -49,7 +48,7 @@ def main():
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
 
-    # cudnn related setting
+    # CUDnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
     cudnn.deterministic = config.CUDNN.DETERMINISTIC
     cudnn.enabled = config.CUDNN.ENABLED

@@ -13,10 +13,10 @@ DATASET:
   ROOT: data/
   TEST_SET: 'list/cityscapes/val.lst'
   TRAIN_SET: 'list/cityscapes/train.lst'
-  NUM_CLASSES: 19
+  NUM_CLASSES: 2
 MODEL:
   NAME: pidnet_small
-  NUM_OUTPUTS: 2  # was changed?
+  NUM_OUTPUTS: 2
   PRETRAINED: "pretrained_models/imagenet/PIDNet_S_ImageNet.pth.tar"
 LOSS:
   USE_OHEM: true
@@ -28,21 +28,19 @@ TRAIN:
   IMAGE_SIZE:
   - 1024
   - 1024
-  BASE_SIZE: 2048
-  BATCH_SIZE_PER_GPU: 12
+  BASE_SIZE: 2048  # used in resizing augmentation
+  BATCH_SIZE_PER_GPU: 12  # batch size
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 30
+  END_EPOCH: 30  # num epochs
   RESUME: false
-  OPTIMIZER: sgd
-  LR: 0.01
+  OPTIMIZER: adam
+  LR: 0.001
   WD: 0.0005
-  MOMENTUM: 0.9
-  NESTEROV: false
   FLIP: true
   MULTI_SCALE: true
   IGNORE_LABEL: 255
-  SCALE_FACTOR: 16
+  SCALE_FACTOR: 16  # in resizing augmentation, divided by 10
 TEST:
   IMAGE_SIZE:
   - 4096
