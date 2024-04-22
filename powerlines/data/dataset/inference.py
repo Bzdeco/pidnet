@@ -7,8 +7,6 @@ from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig
 from powerlines.data.utils import load_filtered_filepaths, load_annotations, load_complete_frame
 
-ORIG_SIZE = torch.tensor([3000, 4096])
-
 
 class InferenceCablesDetectionDataset(BaseDataset):
     def __init__(
@@ -50,7 +48,16 @@ class InferenceCablesDetectionDataset(BaseDataset):
             image, labels, generate_edge=False, multi_scale=False, is_flip=False, edge_pad=False
         )
 
-        return image, labels, edge, np.array(size), name
+        sample = {
+            "image": image,
+            "labels": labels,
+            "size": np.array(size),
+            "name": name
+        }
+        if edge is not None:
+            sample["edge"] = edge
+
+        return sample
 
     def __len__(self) -> int:
         return self.num_frames

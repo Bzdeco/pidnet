@@ -160,15 +160,14 @@ def main():
         logging.info(msg)
         logging.info(IoU_array)
 
-    torch.save(model.module.state_dict(), os.path.join(output_folder, 'final_state.pt'))
-    logger.info('Done')
+    save_checkpoint(epoch, output_folder, model, optimizer, "final_state.pt")
 
 
 def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optimizer, filename: Optional[str] = None):
     filename = filename or f"{epoch:03d}.pt"
     torch.save({
         "epoch": epoch + 1,
-        "state_dict": model.module.state_dict(),
+        "state_dict": model.model.state_dict(),
         "optimizer": optimizer.state_dict(),
     }, folder / filename)
 

@@ -87,7 +87,6 @@ class BaseDataset(data.Dataset):
 
     def multi_scale_aug(self, image, label=None, edge=None, rand_scale=1.0, rand_crop=True):
         long_size = int(self.base_size * rand_scale + 0.5)
-        image = channel_last(image)
         h, w = image.shape[:2]
 
         if h > w:
@@ -130,7 +129,9 @@ class BaseDataset(data.Dataset):
             edge = (cv2.dilate(edge, kernel, iterations=1) > 50) * 1.0
         else:
             edge = None
-        
+
+        image = channel_last(image)
+
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
             image, label, edge = self.multi_scale_aug(image, label, edge, rand_scale=rand_scale)
