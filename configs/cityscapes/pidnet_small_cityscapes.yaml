@@ -13,7 +13,7 @@ DATASET:
   ROOT: data/
   TEST_SET: 'list/cityscapes/val.lst'
   TRAIN_SET: 'list/cityscapes/train.lst'
-  NUM_CLASSES: 19
+  NUM_CLASSES: 2  # adapted to powerlines
 MODEL:
   NAME: pidnet_small
   NUM_OUTPUTS: 2
@@ -29,12 +29,12 @@ TRAIN:
   - 1024
   - 1024
   BASE_SIZE: 2048
-  BATCH_SIZE_PER_GPU: 6
+  BATCH_SIZE_PER_GPU: 12
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 484
+  END_EPOCH: 30
   RESUME: false
-  OPTIMIZER: sgd
+  OPTIMIZER: sgd  # TODO: replace optimizer with Adam
   LR: 0.01
   WD: 0.0005
   MOMENTUM: 0.9
@@ -45,10 +45,10 @@ TRAIN:
   SCALE_FACTOR: 16
 TEST:
   IMAGE_SIZE:
-  - 2048
-  - 1024
+  - 4096
+  - 3000
   BASE_SIZE: 2048
-  BATCH_SIZE_PER_GPU: 6
+  BATCH_SIZE_PER_GPU: 12
   FLIP_TEST: false
   MULTI_SCALE: false
   MODEL_FILE: ''

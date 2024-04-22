@@ -4,9 +4,7 @@
 
 import argparse
 import os
-import pprint
 
-import logging
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +12,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.optim
 from hydra import initialize, compose
+from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig
 from torch import nn
 from torch.optim import Optimizer
@@ -25,7 +24,7 @@ from configs import update_config
 from tools import factory
 from utils.criterion import CrossEntropy, OhemCrossEntropy, BoundaryLoss
 from utils.function import train, validate
-from utils.utils import create_logger, FullModel, checkpoint_folder, create_neptune_run, run_id
+from utils.utils import FullModel, checkpoint_folder, create_neptune_run, run_id
 
 
 def parse_args():
@@ -64,10 +63,8 @@ def main():
 
     run = create_neptune_run(config_powerlines.name, resume=False, from_run_id=None)
     output_folder = checkpoint_folder(config_powerlines, run_id(run))
-    logger, tb_log_dir = create_logger(args.cfg, output_folder, 'train')  # TODO: replace with neptune
-
-    logger.info(pprint.pformat(args))
-    logger.info(config)
+    run["config/powerlines"] = stringify_unsupported(config_powerlines)
+    run["config/pidnet"] = stringify_unsupported(dict(config))
 
     # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
@@ -105,7 +102,6 @@ def main():
             ignore_label=config.TRAIN.IGNORE_LABEL,
             weight=train_dataset.class_weights
         )
-
     bd_criterion = BoundaryLoss()
 
     pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
@@ -114,44 +110,25 @@ def main():
 
     epoch_iters = int(len(train_dataset) / config.TRAIN.BATCH_SIZE_PER_GPU)
         
-    best_mIoU = 0
     last_epoch = 0
-    is_resumed = config.TRAIN.RESUME
     if config.TRAIN.RESUME:
         model_state_file = os.path.join(output_folder, 'checkpoint.pth.tar')
         if os.path.isfile(model_state_file):
             checkpoint = torch.load(model_state_file, map_location={'cuda:0': 'cpu'})
-            best_mIoU = checkpoint['best_mIoU']
             last_epoch = checkpoint['epoch']
             dct = checkpoint['state_dict']
             
             model.module.model.load_state_dict({k.replace('model.', ''): v for k, v in dct.items() if k.startswith('model.')})
             optimizer.load_state_dict(checkpoint['optimizer'])
-            logger.info("=> loaded checkpoint (epoch {})".format(checkpoint['epoch']))
+            print("Loaded checkpoint (epoch {})".format(checkpoint['epoch']))
 
     end_epoch = config.TRAIN.END_EPOCH
     num_iters = config.TRAIN.END_EPOCH * epoch_iters
-    real_end = 120+1 if 'camvid' in config.DATASET.TRAIN_SET else end_epoch
-    
-    for epoch in range(last_epoch, real_end):
-        train(epoch, epoch_iters, config.TRAIN.LR, num_iters, train_dataloader, optimizer, model)
 
-        if is_resumed == 1 or (epoch % 5 == 0 and epoch < real_end - 100) or (epoch >= real_end - 100):
-            valid_loss, mean_IoU, IoU_array = validate(config, val_dataloader, model)
-        if is_resumed == 1:
-            is_resumed = 0
-
+    for epoch in range(last_epoch, end_epoch):
+        train(run, config_powerlines, epoch, epoch_iters, config.TRAIN.LR, num_iters, train_dataloader, optimizer, model)
+        validate(config, run, val_dataloader, model)
         save_checkpoint(epoch, output_folder, model, optimizer)
-
-        if mean_IoU > best_mIoU:
-            best_mIoU = mean_IoU
-            save_checkpoint(epoch, output_folder, model, optimizer, "best_miou.pt")
-
-        msg = 'Loss: {:.3f}, MeanIU: {: 4.4f}, Best_mIoU: {: 4.4f}'.format(valid_loss, mean_IoU, best_mIoU)
-        logging.info(msg)
-        logging.info(IoU_array)
-
-    save_checkpoint(end_epoch, output_folder, model, optimizer, "final_state.pt")
 
 
 def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optimizer, filename: Optional[str] = None):
