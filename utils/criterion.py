@@ -38,6 +38,12 @@ class CrossEntropy(nn.Module):
 
 
 class OhemCrossEntropy(nn.Module):
+    """
+    Online hard example mining, the threshold for hard predictions is computed at min_kept of sorted predictions and set to
+    at least the value thresh (or higher if prediction scores are higher at min_kept). Then the predictions with scores
+    below this threshold are mined for standard CE loss function.
+    """
+
     def __init__(self, ignore_label=-1, thres=0.7, min_kept=100000, weight=None):
         super(OhemCrossEntropy, self).__init__()
         self.thresh = thres
