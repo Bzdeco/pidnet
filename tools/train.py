@@ -42,7 +42,7 @@ def default_commandline_arguments() -> DictConfig:
     })
 
 
-def main(config_powerlines: DictConfig) -> Optional[float]:  # returns optimized quality metric
+def train(config_powerlines: DictConfig) -> Optional[float]:  # returns optimized quality metric
     args = default_commandline_arguments()
     update_config(config, args)
 
@@ -141,4 +141,4 @@ def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optim
 
 
 if __name__ == '__main__':
-    main(powerlines_config())
+    train(powerlines_config())
