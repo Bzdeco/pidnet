@@ -2,6 +2,7 @@ from typing import Optional
 
 import numpy as np
 import torch
+from omegaconf import DictConfig
 
 from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig
@@ -11,15 +12,16 @@ from powerlines.data.utils import load_filtered_filepaths, load_annotations, loa
 class InferenceCablesDetectionDataset(BaseDataset):
     def __init__(
         self,
+        data_config: DictConfig,
         data_source: DataSourceConfig,
         loading: LoadingConfig,
         num_frames: Optional[int] = None
     ):
         super().__init__(
             ignore_label=255,
-            base_size=2048,
+            base_size=data_config.patch_size,
             crop_size=(3000, 4096),
-            scale_factor=16
+            scale_factor=data_config.augmentations.multi_scale.scale_factor
         )
 
         self.data_source = data_source
@@ -44,7 +46,7 @@ class InferenceCablesDetectionDataset(BaseDataset):
         labels = frame["labels"]
 
         image, labels, edge = self.generate_sample(
-            image, labels, generate_edge=False, multi_scale=False, is_flip=False, edge_pad=False
+            image, labels, generate_edge=False, use_multi_scale=False, use_flipping=False, edge_pad=False
         )
 
         sample = {

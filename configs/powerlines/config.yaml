@@ -1,11 +1,30 @@
 name: pidnet-cables
 
+epochs: 30
+optimized_metric: quality
+
 data:
+  augmentations:
+    color_jitter:
+      enabled: true
+      magnitude: 0.2
+    flip:
+      enabled: true
+    multi_scale:
+      enabled: true
+      scale_factor: 15
+
   downsampling_factor: 16
   patch_size: 1024
   perturbation: 384
   negative_sample_prob: 0.12
   non_sky_bias: 0.5
+  num_workers:
+    train: 8
+    val: 8
+  batch_size:
+    train: 12
+    val: 12
   cv:
     num_folds: 5
     fold: null
@@ -15,7 +34,16 @@ data:
     train: null
     val: null
 
+loss:
+  ohem:
+    enabled: true
+    threshold: 0.9
+    keep_fraction: 0.125
+
 optimizer:
+  name: adam
+  lr: 1e-4
+  wd: 1e-4
   adjust_lr: false
 
 paths:
@@ -24,5 +52,5 @@ paths:
   checkpoints: /scratch/cvlab/home/gwizdala/output/checkpoints
 
 visualization:
-  n_images_per_epoch: 2
+  n_images_per_epoch: 3
   every: 1

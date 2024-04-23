@@ -101,7 +101,7 @@ class BaseDataset(data.Dataset):
             new_h = int(h * long_size / w + 0.5)
 
         # Channel last for resizing: https://stackoverflow.com/a/69348858
-        image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
         if label is not None:
             label = cv2.resize(label.astype(int), (new_w, new_h), interpolation=cv2.INTER_NEAREST).astype(bool)
             if edge is not None:
@@ -119,8 +119,8 @@ class BaseDataset(data.Dataset):
         image: np.ndarray,
         label: np.ndarray,
         generate_edge: bool = False,
-        multi_scale=True,
-        is_flip=True,
+        use_multi_scale: bool = True,
+        use_flipping: bool = True,
         edge_pad=True,
         edge_size=4
     ):
@@ -136,7 +136,7 @@ class BaseDataset(data.Dataset):
 
         image = channel_last(image)
 
-        if multi_scale:
+        if use_multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
             image, label, edge = self.multi_scale_aug(image, label, edge, rand_scale=rand_scale)
 
@@ -144,7 +144,7 @@ class BaseDataset(data.Dataset):
         label = self.label_transform(label)
 
         # Horizontal flipping, copy to fix negative strides
-        if is_flip:
+        if use_flipping:
             flip = np.random.choice(2) * 2 - 1
             image = image[:, :, ::flip].copy()
             label = label[:, ::flip].copy()

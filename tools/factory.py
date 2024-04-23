@@ -41,6 +41,7 @@ def sampling(config: DictConfig) -> SamplingConfig:
 
 def train_dataset(config: DictConfig) -> Dataset:
     return TrainCablesDetectionDataset(
+        data_config=config.data,
         data_source=data_source(config, "train"),
         loading=loading(config),
         sampling=sampling(config),
@@ -50,29 +51,32 @@ def train_dataset(config: DictConfig) -> Dataset:
 
 def val_dataset(config: DictConfig) -> Dataset:
     return InferenceCablesDetectionDataset(
+        data_config=config.data,
         data_source=data_source(config, "val"),
         loading=loading(config),
         num_frames=config.data.size.val
     )
 
 
-def optimizer(config, model: nn.Module):
+def optimizer(config_powerlines: DictConfig, model: nn.Module):
     params_dict = dict(model.named_parameters())
-    params = [{"params": list(params_dict.values()), "lr": config.TRAIN.LR}]
+    optimizer_config = config_powerlines.optimizer
 
-    if config.TRAIN.OPTIMIZER == "sgd":
+    params = [{"params": list(params_dict.values()), "lr": optimizer_config.lr}]
+
+    if optimizer_config.name == "sgd":
         return torch.optim.SGD(
             params,
-            lr=config.TRAIN.LR,
-            momentum=config.TRAIN.MOMENTUM,
-            weight_decay=config.TRAIN.WD,
-            nesterov=config.TRAIN.NESTEROV,
+            lr=optimizer_config.lr,
+            momentum=optimizer_config.momentum,
+            weight_decay=optimizer_config.wd,
+            nesterov=optimizer_config.nesterov,
         )
-    elif config.TRAIN.OPTIMIZER == "adam":
+    elif optimizer_config.name == "adam":
         return torch.optim.Adam(
             params,
-            lr=config.TRAIN.LR,
-            weight_decay=config.TRAIN.WD
+            lr=optimizer_config.lr,
+            weight_decay=optimizer_config.wd
         )
     else:
-        raise ValueError(f"Unsupported optimized {config.TRAIN.OPTIMIZER}")
+        raise ValueError(f"Unsupported optimized {optimizer_config.name}")

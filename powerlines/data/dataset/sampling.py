@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 import torch
 import torchvision.transforms.v2 as transforms
+from omegaconf import DictConfig
 
 from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig, SamplingConfig
@@ -16,6 +17,7 @@ from powerlines.utils import parallelize
 class TrainCablesDetectionDataset(BaseDataset):
     def __init__(
         self,
+        data_config: DictConfig,
         data_source: DataSourceConfig,
         loading: LoadingConfig,
         sampling: SamplingConfig,
@@ -24,9 +26,9 @@ class TrainCablesDetectionDataset(BaseDataset):
     ):
         super().__init__(
             ignore_label=255,
-            base_size=2048,
-            crop_size=(1024, 1024),  # adapted to 1K square
-            scale_factor=16
+            base_size=data_config.patch_size,
+            crop_size=(data_config.patch_size,) * 2,
+            scale_factor=data_config.augmentations.multi_scale.scale_factor
         )
 
         self.data_source = data_source
@@ -37,8 +39,17 @@ class TrainCablesDetectionDataset(BaseDataset):
         self.annotations = load_annotations(data_source)
         self.num_frames = num_frames if num_frames is not None else len(self.filepaths)
 
+        # Data augmentations
+        self.use_color_jitter = data_config.augmentations.color_jitter.enabled
+        self.use_flipping = data_config.augmentations.flip.enabled
+        self.use_multi_scale = data_config.augmentations.multi_scale.enabled
+
+        magnitude = data_config.augmentations.color_jitter.magnitude
         self.color_jitter = transforms.ColorJitter(
-            brightness=[0.8, 1.2], contrast=[0.8, 1.2], saturation=[0.8, 1.2], hue=[-0.2, 0.2]
+            brightness=[1 - magnitude, 1 + magnitude],
+            contrast=[1 - magnitude, 1 + magnitude],
+            saturation=[1 - magnitude, 1 + magnitude],
+            hue=[-magnitude, magnitude]
         )
 
         self._loading_data = self._frames_loading_data()
@@ -81,7 +92,9 @@ class TrainCablesDetectionDataset(BaseDataset):
         image = self._extract_patch(frame["image"], y, x)
         labels = self._extract_patch(frame["labels"], y, x)
 
-        image, labels, edge = self.generate_sample(image, labels, generate_edge=False)
+        image, labels, edge = self.generate_sample(
+            image, labels, generate_edge=False, use_multi_scale=self.use_multi_scale, use_flipping=self.use_flipping
+        )
 
         sample = {
             "image": image,
@@ -100,7 +113,8 @@ class TrainCablesDetectionDataset(BaseDataset):
         image = image / 255.0
 
         # Color jitter
-        image = self.color_jitter(torch.from_numpy(image).permute((2, 0, 1))).permute((1, 2, 0)).numpy()
+        if self.use_color_jitter:
+            image = self.color_jitter(torch.from_numpy(image).permute((2, 0, 1))).permute((1, 2, 0)).numpy()
 
         # Normalize
         image -= self.mean

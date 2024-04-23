@@ -2,7 +2,6 @@
 # Modified based on https://github.com/HRNet/HRNet-Semantic-Segmentation
 # ------------------------------------------------------------------------------
 
-import argparse
 import os
 
 from pathlib import Path
@@ -27,23 +26,7 @@ from utils.function import train, validate
 from utils.utils import FullModel, checkpoint_folder, create_neptune_run, run_id
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='Train segmentation network')
-    
-    parser.add_argument('--cfg',
-                        help='experiment configure file name',
-                        default="configs/powerlines/pidnet_small_powerlines.yaml",
-                        type=str)
-    parser.add_argument('--seed', type=int, default=304)
-    parser.add_argument('opts',
-                        help="Modify config options using the command-line",
-                        default=None,
-                        nargs=argparse.REMAINDER)
-
-    args = parser.parse_args()
-    update_config(config, args)
-
-    return args
+SEED = 304
 
 
 def powerlines_config() -> DictConfig:
@@ -51,15 +34,22 @@ def powerlines_config() -> DictConfig:
         return compose(config_name="config")
 
 
-def main():
-    args = parse_args()
-    config_powerlines = powerlines_config()
+def default_commandline_arguments() -> DictConfig:
+    return DictConfig({
+        "cfg": "configs/powerlines/pidnet_small_powerlines.yaml",
+        "seed": SEED,
+        "opts": None
+    })
 
-    if args.seed > 0:
-        import random
-        print("Seeding with", args.seed)
-        random.seed(args.seed)
-        torch.manual_seed(args.seed)        
+
+def main(config_powerlines: DictConfig) -> float:  # returns optimized quality metric
+    args = default_commandline_arguments()
+    update_config(config, args)
+
+    import random
+    print("Seeding with", SEED)
+    random.seed(SEED)
+    torch.manual_seed(SEED)
 
     run = create_neptune_run(config_powerlines.name, resume=False, from_run_id=None)
     output_folder = checkpoint_folder(config_powerlines, run_id(run))
@@ -74,27 +64,30 @@ def main():
     train_dataset = factory.train_dataset(config_powerlines)
     train_dataloader = DataLoader(
         train_dataset,
-        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU,
+        batch_size=config_powerlines.data.batch_size.train,
         shuffle=config.TRAIN.SHUFFLE,
-        num_workers=config.WORKERS,
+        num_workers=config_powerlines.data.num_workers.train,
         pin_memory=False,
         drop_last=True
     )
 
     val_dataloader = DataLoader(
         factory.val_dataset(config_powerlines),
-        batch_size=config.TEST.BATCH_SIZE_PER_GPU,
+        batch_size=config_powerlines.data.batch_size.val,
         shuffle=False,
-        num_workers=config.WORKERS,
+        num_workers=config_powerlines.data.num_workers.val,
         pin_memory=False
     )
 
     # criterion
-    if config.LOSS.USE_OHEM:
+    ohem_config = config_powerlines.ohem
+    if ohem_config.enabled:
+        print("Using OHEM in loss function")
+        min_kept = int(ohem_config.keep_fraction * (config_powerlines.data.patch_size ** 2))
         semantic_seg_criterion = OhemCrossEntropy(
             ignore_label=config.TRAIN.IGNORE_LABEL,
-            thres=config.LOSS.OHEMTHRES,
-            min_kept=config.LOSS.OHEMKEEP,
+            thres=ohem_config.threshold,
+            min_kept=min_kept,
             weight=train_dataset.class_weights
         )
     else:
@@ -106,10 +99,10 @@ def main():
 
     pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
     model = FullModel(pidnet, semantic_seg_criterion, bd_criterion).cuda()
-    optimizer = factory.optimizer(config, model)
+    optimizer = factory.optimizer(config_powerlines, model)
 
-    epoch_iters = int(len(train_dataset) / config.TRAIN.BATCH_SIZE_PER_GPU)
-        
+    epoch_iters = int(len(train_dataset) / config_powerlines.data.batch_size.train)
+
     last_epoch = 0
     if config.TRAIN.RESUME:
         model_state_file = os.path.join(output_folder, 'checkpoint.pth.tar')
@@ -117,18 +110,20 @@ def main():
             checkpoint = torch.load(model_state_file, map_location={'cuda:0': 'cpu'})
             last_epoch = checkpoint['epoch']
             dct = checkpoint['state_dict']
-            
+
             model.module.model.load_state_dict({k.replace('model.', ''): v for k, v in dct.items() if k.startswith('model.')})
             optimizer.load_state_dict(checkpoint['optimizer'])
             print("Loaded checkpoint (epoch {})".format(checkpoint['epoch']))
 
-    end_epoch = config.TRAIN.END_EPOCH
-    num_iters = config.TRAIN.END_EPOCH * epoch_iters
+    n_epochs = config_powerlines.epochs
+    num_iters = n_epochs * epoch_iters
 
-    for epoch in range(last_epoch, end_epoch):
-        train(run, config_powerlines, epoch, epoch_iters, config.TRAIN.LR, num_iters, train_dataloader, optimizer, model)
-        validate(epoch, config, config_powerlines, run, val_dataloader, model)
+    for epoch in range(last_epoch, n_epochs):
+        train(run, config_powerlines, epoch, epoch_iters, num_iters, train_dataloader, optimizer, model)
         save_checkpoint(epoch, output_folder, model, optimizer)
+
+    optimized_metric_value = validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
+    return optimized_metric_value
 
 
 def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optimizer, filename: Optional[str] = None):
@@ -141,4 +136,4 @@ def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optim
 
 
 if __name__ == '__main__':
-    main()
+    main(powerlines_config())

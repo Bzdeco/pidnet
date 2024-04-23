@@ -28,7 +28,6 @@ def train(
     config_powerlines: DictConfig,
     epoch: int,
     epoch_iters: int,
-    base_lr: float,
     num_iters: int,
     dataloader: DataLoader,
     optimizer,
@@ -38,7 +37,7 @@ def train(
 
     loss_meter = AverageMeter()
     accuracy_meter = AverageMeter()
-    cur_iters = epoch*epoch_iters
+    cur_iters = epoch * epoch_iters
 
     for i_iter, batch in enumerate(tqdm(dataloader, desc="Training")):
         images = batch["image"].cuda()
@@ -59,14 +58,17 @@ def train(
         loss_meter.update(loss.item())
         accuracy_meter.update(acc.item())
 
-        if config_powerlines.optimizer.adjust_lr:
-            adjust_learning_rate(optimizer, base_lr, num_iters, i_iter+cur_iters)
+        optimizer_config = config_powerlines.optimizer
+        if optimizer_config.adjust_lr:
+            adjust_learning_rate(optimizer, optimizer_config.lr, num_iters, i_iter + cur_iters)
 
     run["metrics/train/loss/total"].log(loss_meter.average())
     run["metrics/train/accuracy"].log(accuracy_meter.average())
 
 
-def validate(epoch: int, config, config_powerlines: DictConfig, run: Run, dataloader: DataLoader, model: nn.Module):
+def validate(
+    epoch: int, config, config_powerlines: DictConfig, run: Run, dataloader: DataLoader, model: nn.Module
+) -> float:
     model.eval()
 
     loss_meter = AverageMeter()
@@ -91,8 +93,11 @@ def validate(epoch: int, config, config_powerlines: DictConfig, run: Run, datalo
 
     # Log metrics
     run["metrics/val/loss/total"].log(loss_meter.average())
-    for name, value in seg_metrics.compute().items():
+    metrics = seg_metrics.compute()
+    for name, value in metrics.items():
         run[f"metrics/val/{name}"].log(value)
+
+    return metrics[config_powerlines.optimized_metric]
 
 
 def testval(config, test_dataset, testloader, model,

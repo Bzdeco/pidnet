@@ -5,8 +5,6 @@ CUDNN:
 GPUS: (0,)
 OUTPUT_DIR: 'output'
 LOG_DIR: 'log'
-WORKERS: 8
-PRINT_FREQ: 10
 
 DATASET:
   DATASET: cityscapes
@@ -19,35 +17,13 @@ MODEL:
   NUM_OUTPUTS: 2
   PRETRAINED: "pretrained_models/imagenet/PIDNet_S_ImageNet.pth.tar"
 LOSS:
-  USE_OHEM: true
-  OHEMTHRES: 0.9
-  OHEMKEEP: 131072  # 0.125 of 1024x1024
   BALANCE_WEIGHTS: [0.4, 1.0]
   SB_WEIGHTS: 1.0
 TRAIN:
-  IMAGE_SIZE:
-  - 1024
-  - 1024
-  BASE_SIZE: 2048  # used in resizing augmentation
-  BATCH_SIZE_PER_GPU: 12  # batch size
   SHUFFLE: true
   BEGIN_EPOCH: 0
-  END_EPOCH: 30  # num epochs
   RESUME: false
-  OPTIMIZER: adam
-  LR: 0.0001
-  WD: 0.0001
-  FLIP: true
-  MULTI_SCALE: true
   IGNORE_LABEL: 255
-  SCALE_FACTOR: 16  # in resizing augmentation, divided by 10
 TEST:
-  IMAGE_SIZE:
-  - 4096
-  - 3000
-  BASE_SIZE: 2048
-  BATCH_SIZE_PER_GPU: 12
-  FLIP_TEST: false
-  MULTI_SCALE: false
   MODEL_FILE: ''
   OUTPUT_INDEX: 1
