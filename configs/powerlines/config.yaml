@@ -2,6 +2,7 @@ name: pidnet-cables
 
 epochs: 30
 optimized_metric: quality
+verbose: false
 
 data:
   augmentations:

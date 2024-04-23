@@ -42,7 +42,8 @@ def train(
     accuracy_meter = AverageMeter()
     cur_iters = epoch * epoch_iters
 
-    for i_iter, batch in enumerate(tqdm(dataloader, desc="Training")):
+    iterator = tqdm(dataloader, desc="Training") if config_powerlines.verbose else dataloader
+    for i_iter, batch in enumerate(iterator):
         images = batch["image"].cuda()
         bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
 
@@ -82,7 +83,8 @@ def validate(
     vis_logger = VisualizationLogger(run, config_powerlines)
 
     with torch.no_grad():
-        for idx, batch in enumerate(tqdm(dataloader, desc="Validating")):
+        iterator = tqdm(dataloader, desc="Validating") if config_powerlines.verbose else dataloader
+        for idx, batch in enumerate(iterator):
             images = batch["image"].cuda()
             bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
             labels = batch["labels"].cuda()
