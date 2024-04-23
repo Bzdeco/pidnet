@@ -21,19 +21,17 @@ def fetch_run(project: str, run_id: int, mode: str = "read-only"):
 
 
 def create_neptune_hpo_run(config: DictConfig, debug: bool = False) -> Run:
-    neptune_config = config.logger
-
     return neptune.init_run(
-        project=config.user.project,
+        project="jakubg/powerlines",
         api_token=os.environ["NEPTUNE_API_TOKEN"],
         name=config.name,
         tags=["hpo"],
-        mode=neptune_config.mode if not debug else "debug",
+        mode="async" if not debug else "debug",
         capture_stdout=True,
         capture_stderr=True,
         capture_traceback=False,
         capture_hardware_metrics=True,
-        flush_period=neptune_config.flush_period
+        flush_period=300
     )
 
 

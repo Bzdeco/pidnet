@@ -2,10 +2,9 @@ from utils import seed
 seed.set_global_seeds()
 
 from powerlines.hpo import HyperparameterOptimizationCallback, fetch_run
-from tools.train import train
+from tools.train import run_training
 
 import argparse
-import multiprocessing
 
 from pathlib import Path
 from typing import List, Dict, Any, Union
@@ -20,9 +19,8 @@ from smac.intensifier import Hyperband
 # Absolutely maximal amounts of batch sizes to not exceed GPU memory for 5 concurrent runs
 # TODO if used
 CONFIG_FOR_PATCH_SIZE = {
-    256: {"batch_size": 128, "num_workers": 8},
-    512: {"batch_size": 32, "num_workers": 8},
-    1024: {"batch_size": 8, "num_workers": 8}
+    512: {"batch_size": 32},
+    1024: {"batch_size": 16}
 }
 SMALLEST_PATCH_SIZE = 512
 
@@ -66,7 +64,7 @@ def overrides_from_hpc(
         f"loss.ohem.enabled={config['ohem_enabled']}",
         f"optimizer.lr={config['lr']}",
         f"optimizer.wd={config['wd']}",
-        f"trainer.epochs={epochs}"
+        f"epochs={epochs}"
     ]
 
 
@@ -85,7 +83,7 @@ class HPORunner:
         self,
         name: str,
         optimized_metric: str,
-        goal: str = "maximize",
+        goal: str = "maximize"
     ):
         self.name = name
         self._optimized_metric = optimized_metric
@@ -135,7 +133,7 @@ class HPORunner:
             )
             return 1  # worst possible result
 
-        optimized_metric = train(hydra_config)
+        optimized_metric = run_training(hydra_config)
 
         if self._goal == "maximize":
             return 1 - optimized_metric  # SMAC minimizes the target function
@@ -156,7 +154,7 @@ def run_hyper_parameter_search(
 ):
     torch.cuda.empty_cache()
 
-    hpo_runner = HPORunner(name, optimized_metric, manager)
+    hpo_runner = HPORunner(name, optimized_metric)
 
     scenario = Scenario(
         hpo_runner.configuration_space(),
@@ -215,15 +213,14 @@ if __name__ == '__main__':
         f"resume={resume}\n"
     )
 
-    with multiprocessing.Manager() as manager:
-        run_hyper_parameter_search(
-            name,
-            metric,
-            output,
-            n_trials,
-            n_workers,
-            min_epochs,
-            args.max_epochs,
-            n_initial_designs,
-            resume=resume,
-        )
+    run_hyper_parameter_search(
+        name,
+        metric,
+        output,
+        n_trials,
+        n_workers,
+        min_epochs,
+        args.max_epochs,
+        n_initial_designs,
+        resume=resume,
+    )
