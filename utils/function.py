@@ -9,6 +9,7 @@ import numpy as np
 from neptune import Run
 from omegaconf import DictConfig
 from torch import nn
+from torch.cuda.amp import GradScaler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -30,7 +31,8 @@ def train(
     epoch_iters: int,
     num_iters: int,
     dataloader: DataLoader,
-    optimizer,
+    optimizer: torch.optim.Optimizer,
+    scaler: GradScaler,
     model
 ):
     model.train()
@@ -46,13 +48,15 @@ def train(
         labels = batch["labels"].cuda()
         labels = downsample_labels(labels.float(), grid_size=16, adjust_to_divisible=False).long()
 
-        losses, _, acc, loss_list = model(images, labels, bd_gts)
-        loss = losses.mean()
-        acc = acc.mean()
+        with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True, cache_enabled=True):
+            losses, _, acc, loss_list = model(images, labels, bd_gts)
+            loss = losses.mean()
+            acc = acc.mean()
 
-        model.zero_grad()
-        loss.backward()
-        optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
 
         # update average loss
         loss_meter.update(loss.item())
@@ -83,7 +87,8 @@ def validate(
             labels = downsample_labels(labels.float(), grid_size=16, adjust_to_divisible=False).long()
 
             # Inference
-            losses, predictions, _, _ = model(images, labels, bd_gts)
+            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True, cache_enabled=True):
+                losses, predictions, _, _ = model(images, labels, bd_gts)
 
             # Update metrics
             seg_predictions = predictions[config.TEST.OUTPUT_INDEX]

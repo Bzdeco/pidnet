@@ -14,6 +14,7 @@ from hydra import initialize, compose
 from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig
 from torch import nn
+from torch.cuda import amp
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
@@ -42,7 +43,7 @@ def default_commandline_arguments() -> DictConfig:
     })
 
 
-def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns optimized quality metric
+def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns optimized metric
     args = default_commandline_arguments()
     update_config(config, args)
 
@@ -100,6 +101,7 @@ def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns o
     pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
     model = FullModel(pidnet, semantic_seg_criterion, bd_criterion).cuda()
     optimizer = factory.optimizer(config_powerlines, model)
+    scaler = amp.GradScaler(enabled=True)
 
     epoch_iters = int(len(train_dataset) / config_powerlines.data.batch_size.train)
 
@@ -120,7 +122,7 @@ def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns o
     validation_config = config_powerlines.validation
 
     for epoch in range(last_epoch, n_epochs):
-        train(run, config_powerlines, epoch, epoch_iters, num_iters, train_dataloader, optimizer, model)
+        train(run, config_powerlines, epoch, epoch_iters, num_iters, train_dataloader, optimizer, scaler, model)
         if validation_config.every:
             validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
         save_checkpoint(epoch, output_folder, model, optimizer)
