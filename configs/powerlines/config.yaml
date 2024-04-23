@@ -24,7 +24,7 @@ data:
     val: 4
   batch_size:
     train: 12
-    val: 2
+    val: 4
   cv:
     num_folds: 5
     fold: null
