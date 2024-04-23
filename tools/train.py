@@ -42,7 +42,7 @@ def default_commandline_arguments() -> DictConfig:
     })
 
 
-def main(config_powerlines: DictConfig) -> float:  # returns optimized quality metric
+def main(config_powerlines: DictConfig) -> Optional[float]:  # returns optimized quality metric
     args = default_commandline_arguments()
     update_config(config, args)
 
@@ -117,13 +117,18 @@ def main(config_powerlines: DictConfig) -> float:  # returns optimized quality m
 
     n_epochs = config_powerlines.epochs
     num_iters = n_epochs * epoch_iters
+    validation_config = config_powerlines.validation
 
     for epoch in range(last_epoch, n_epochs):
         train(run, config_powerlines, epoch, epoch_iters, num_iters, train_dataloader, optimizer, model)
+        if validation_config.every:
+            validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
         save_checkpoint(epoch, output_folder, model, optimizer)
 
-    optimized_metric_value = validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
-    return optimized_metric_value
+    if validation_config.last:
+        return validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
+    else:
+        return None
 
 
 def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optimizer, filename: Optional[str] = None):

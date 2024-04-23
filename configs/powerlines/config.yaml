@@ -51,6 +51,10 @@ paths:
   annotations: /scratch/cvlab/home/gwizdala/dataset/daedalean/cable-annotations
   checkpoints: /scratch/cvlab/home/gwizdala/output/checkpoints
 
+validation:
+  every: true
+  last: false
+
 visualization:
   n_images_per_epoch: 3
   every: 1
