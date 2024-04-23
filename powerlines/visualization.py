@@ -51,8 +51,8 @@ def visualize_cables_detection(
     image: torch.Tensor, prediction: torch.Tensor, target: torch.Tensor, downsampling_factor: int
 ) -> Image:
     image_vis = undo_image_preprocessing(image.detach().cpu()).permute((1, 2, 0)).int()
-    pred_vis = pad_to(upsample(segmentation_as_image(prediction.detach().cpu()), downsampling_factor), (3000, 4096))
-    target_vis = pad_to(upsample(segmentation_as_image(target.detach().cpu()), downsampling_factor), (3000, 4096))
+    pred_vis = pad_to(upsample(segmentation_as_image(prediction.detach().cpu().float()), downsampling_factor), (3000, 4096))
+    target_vis = pad_to(upsample(segmentation_as_image(target.detach().cpu().float()), downsampling_factor), (3000, 4096))
     stacked_vis = torch.concatenate((image_vis, pred_vis, target_vis), dim=1)
 
     width, height = 1024 * 3, 750

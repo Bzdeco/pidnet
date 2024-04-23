@@ -36,6 +36,7 @@ def train(
     model
 ):
     model.train()
+    torch.cuda.empty_cache()
 
     loss_meter = AverageMeter()
     accuracy_meter = AverageMeter()
@@ -74,6 +75,7 @@ def validate(
     epoch: int, config, config_powerlines: DictConfig, run: Run, dataloader: DataLoader, model: nn.Module
 ) -> float:
     model.eval()
+    torch.cuda.empty_cache()
 
     loss_meter = AverageMeter()
     seg_metrics = segmentation_metrics()
