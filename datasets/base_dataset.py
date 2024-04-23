@@ -68,7 +68,9 @@ class BaseDataset(data.Dataset):
         pad_h = max(size[0] - h, 0)
         pad_w = max(size[1] - w, 0)
         if pad_h > 0 or pad_w > 0:
-            pad_image = cv2.copyMakeBorder(image, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=padvalue)
+            pad_image = cv2.copyMakeBorder(
+                image.astype(float), 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=padvalue
+            ).astype(image.dtype)
 
         return pad_image
 

@@ -38,7 +38,7 @@ def default_commandline_arguments() -> DictConfig:
     return DictConfig({
         "cfg": "configs/powerlines/pidnet_small_powerlines.yaml",
         "seed": SEED,
-        "opts": None
+        "opts": []
     })
 
 
@@ -80,7 +80,7 @@ def main(config_powerlines: DictConfig) -> Optional[float]:  # returns optimized
     )
 
     # criterion
-    ohem_config = config_powerlines.ohem
+    ohem_config = config_powerlines.loss.ohem
     if ohem_config.enabled:
         print("Using OHEM in loss function")
         min_kept = int(ohem_config.keep_fraction * (config_powerlines.data.patch_size ** 2))

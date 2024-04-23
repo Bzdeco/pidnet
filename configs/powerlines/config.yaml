@@ -20,11 +20,11 @@ data:
   negative_sample_prob: 0.12
   non_sky_bias: 0.5
   num_workers:
-    train: 8
-    val: 8
+    train: 12
+    val: 4
   batch_size:
     train: 12
-    val: 12
+    val: 2
   cv:
     num_folds: 5
     fold: null
