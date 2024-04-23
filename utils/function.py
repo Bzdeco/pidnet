@@ -17,6 +17,7 @@ from torch.nn import functional as F
 
 from powerlines.data.utils import downsample_labels
 from powerlines.evaluation import segmentation_metrics
+from powerlines.visualization import VisualizationLogger
 from utils.utils import AverageMeter
 from utils.utils import get_confusion_matrix
 from utils.utils import adjust_learning_rate
@@ -65,11 +66,12 @@ def train(
     run["metrics/train/accuracy"].log(accuracy_meter.average())
 
 
-def validate(config, run: Run, dataloader: DataLoader, model: nn.Module):
+def validate(epoch: int, config, config_powerlines: DictConfig, run: Run, dataloader: DataLoader, model: nn.Module):
     model.eval()
 
     loss_meter = AverageMeter()
     seg_metrics = segmentation_metrics()
+    vis_logger = VisualizationLogger(run, config_powerlines)
 
     with torch.no_grad():
         for idx, batch in enumerate(tqdm(dataloader, desc="Validating")):
@@ -82,8 +84,10 @@ def validate(config, run: Run, dataloader: DataLoader, model: nn.Module):
             losses, predictions, _, _ = model(images, labels, bd_gts)
 
             # Update metrics
-            seg_metrics(predictions[config.TEST.OUTPUT_INDEX], labels)
+            seg_predictions = predictions[config.TEST.OUTPUT_INDEX]
+            seg_metrics(seg_predictions, labels)
             loss_meter.update(losses.mean().item())
+            vis_logger.visualize(epoch, images, seg_predictions, labels)
 
     # Log metrics
     run["metrics/val/loss/total"].log(loss_meter.average())

@@ -127,7 +127,7 @@ def main():
 
     for epoch in range(last_epoch, end_epoch):
         train(run, config_powerlines, epoch, epoch_iters, config.TRAIN.LR, num_iters, train_dataloader, optimizer, model)
-        validate(config, run, val_dataloader, model)
+        validate(epoch, config, config_powerlines, run, val_dataloader, model)
         save_checkpoint(epoch, output_folder, model, optimizer)
 
 

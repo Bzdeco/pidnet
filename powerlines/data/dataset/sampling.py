@@ -100,7 +100,7 @@ class TrainCablesDetectionDataset(BaseDataset):
         image = image / 255.0
 
         # Color jitter
-        image = self.color_jitter(torch.from_numpy(image)).numpy()
+        image = self.color_jitter(torch.from_numpy(image).permute((2, 0, 1))).permute((1, 2, 0)).numpy()
 
         # Normalize
         image -= self.mean
