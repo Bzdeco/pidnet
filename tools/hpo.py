@@ -17,17 +17,14 @@ from smac import Scenario, MultiFidelityFacade
 from smac.intensifier import Hyperband
 
 # Absolutely maximal amounts of batch sizes to not exceed GPU memory for 5 concurrent runs
-# TODO if used
 CONFIG_FOR_PATCH_SIZE = {
-    512: {"batch_size": 32},
+    512: {"batch_size": 64},
     1024: {"batch_size": 16}
 }
-SMALLEST_PATCH_SIZE = 512
 
 
 def _values_range(base: float, spread: float) -> List[float]:
     return [base - spread, base + spread]
-
 
 
 def perturbation_from_hyperparameters(hyperparameters: Union[Configuration, Dict[str, Any]]) -> int:
@@ -71,11 +68,8 @@ def overrides_from_hpc(
 def _check_is_forbidden_configuration(config: DictConfig) -> bool:
     patch_size = config.data.patch_size
     batch_size = config.data.batch_size.train
-
-    min_batch_size = (1024 // patch_size) ** 2 * 2
     max_batch_size = CONFIG_FOR_PATCH_SIZE[patch_size]["batch_size"]
-
-    return batch_size < min_batch_size or batch_size > max_batch_size
+    return batch_size > max_batch_size
 
 
 class HPORunner:
@@ -96,9 +90,9 @@ class HPORunner:
             Float("color_jitter_magnitude", (0.0, 0.5), default=0.2),
             Categorical("multi_scale_enabled", [False, True], default=True),
             Categorical("patch_size", [512, 1024], default=1024, ordered=True),
-            Float("perturbation_fraction", (0.125, 0.875), default=0.375),
+            Float("perturbation_fraction", (0.0, 0.875), default=0.375),
             Float("negative_sample_prob", (0.0, 0.35), default=0.12),
-            Integer("batch_size", (2, 32), default=12, log=True),
+            Integer("batch_size", (2, 64), default=12, log=True),
             Categorical("ohem_enabled", [False, True], default=True),
             Float("lr", (1e-5, 1e-1), default=1e-2, log=True),
             Float("wd", (1e-6, 1e-1), default=5e-4, log=True),
