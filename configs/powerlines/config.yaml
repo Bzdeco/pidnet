@@ -21,7 +21,7 @@ data:
   negative_sample_prob: 0.12
   non_sky_bias: 0.5
   num_workers:
-    train: 8
+    train: 12
     val: 6
   batch_size:
     train: 12
