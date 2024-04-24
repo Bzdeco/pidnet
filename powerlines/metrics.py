@@ -55,19 +55,19 @@ def distance_transform(
 
 
 def relaxed_confusion_matrix(
-    pred_distance_mask: np.ndarray,
+    pred_prob: np.ndarray,
     target_distance_mask: np.ndarray,
-    bin_thresholds: np.ndarray,
+    prob_thresholds: np.ndarray,
     tolerance_region: float
 ) -> CCQConfusionMatrix:
-    num_thresh = len(bin_thresholds)
+    num_thresh = len(prob_thresholds)
     # [num_thresholds, h, w]
-    pred_bin_cable = np.repeat(pred_distance_mask[np.newaxis], num_thresh, axis=0) < bin_thresholds[:, np.newaxis, np.newaxis]
+    pred_bin_cable = np.repeat(pred_prob[np.newaxis], num_thresh, axis=0) >= prob_thresholds[:, np.newaxis, np.newaxis]
     gt_bin_cable = (target_distance_mask == 0)
     gt_distance = distance_transform(gt_bin_cable)
 
     # Compute distance mask from gt and predictions binarized with different thresholds
-    pred_distance = np.zeros((num_thresh,) + pred_distance_mask.shape[-2:])
+    pred_distance = np.zeros((num_thresh,) + pred_prob.shape[-2:])
     for i in range(num_thresh):
         pred_distance[i] = distance_transform(pred_bin_cable[i])
 
@@ -127,18 +127,17 @@ def f1(precision: Union[float, np.ndarray], recall: Union[float, np.ndarray]) ->
 @dataclass
 class SegmentationMetrics:
     def __init__(
-        self, scoring_thresholds: List[float], tolerance_region: float
+        self, bin_thresholds: List[float], tolerance_region: float
     ):
         self._y_true = torch.empty((0,))
         self._y_pred_prob = torch.empty((0,))
-        self._scoring_thresholds = scoring_thresholds
         self._tolerance_region = tolerance_region
 
-        num_scoring_thresholds = len(scoring_thresholds)
-        self._ccq_threshold = np.asarray([0.5])
-        self._ccq_tp = np.asarray([0] * num_scoring_thresholds)
-        self._ccq_fp = np.asarray([0] * num_scoring_thresholds)
-        self._ccq_fn = np.asarray([0] * num_scoring_thresholds)
+        self._bin_thresholds = np.asarray(bin_thresholds)
+        num_bin_thresholds = len(self._bin_thresholds)
+        self._ccq_tp = np.asarray([0] * num_bin_thresholds)
+        self._ccq_fp = np.asarray([0] * num_bin_thresholds)
+        self._ccq_fn = np.asarray([0] * num_bin_thresholds)
 
     def __call__(self, prediction: torch.Tensor, target_labels: torch.Tensor):
         # Precision, recall, F1
@@ -151,27 +150,26 @@ class SegmentationMetrics:
         # CCQ metrics
         for prediction, target in zip(pred_probabilities, target_labels):
             gt_distance = distance_transform((target == 1).detach().cpu().numpy())
-            for idx, scoring_threshold in enumerate(self._scoring_thresholds):
-                conf_matrix = relaxed_confusion_matrix(
-                    (prediction < scoring_threshold).float().numpy(),
-                    gt_distance,
-                    self._ccq_threshold,  # single threshold to recover binarized cables inside the metric computation
-                    self._tolerance_region
-                )
-                self._ccq_tp[idx] += conf_matrix.tp.item()
-                self._ccq_fp[idx] += conf_matrix.fp.item()
-                self._ccq_fn[idx] += conf_matrix.fn.item()
+            conf_matrix = relaxed_confusion_matrix(
+                prediction.float().numpy(),
+                gt_distance,
+                self._bin_thresholds,
+                self._tolerance_region
+            )
+            self._ccq_tp += conf_matrix.tp
+            self._ccq_fp += conf_matrix.fp
+            self._ccq_fn += conf_matrix.fn
 
     def compute(self) -> Dict[str, float]:
         # Reference metric – quality
         quality_values = quality(self._ccq_tp, self._ccq_fp, self._ccq_fn)
         best_quality_idx = np.argmax(quality_values)
-        best_scoring_threshold = self._scoring_thresholds[best_quality_idx]
+        best_bin_threshold = self._bin_thresholds[best_quality_idx]
         correctness_values = correctness(self._ccq_tp, self._ccq_fp)
         completeness_values = completeness(self._ccq_tp, self._ccq_fn)
 
         y_pred_prob = self._y_pred_prob.detach().cpu().numpy()
-        y_pred = y_pred_prob >= best_scoring_threshold
+        y_pred = y_pred_prob >= best_bin_threshold
         y_true = self._y_true.detach().cpu().numpy()
 
         precision = precision_score(y_true, y_pred)
@@ -187,20 +185,20 @@ class SegmentationMetrics:
             "correctness": correctness_values[best_quality_idx],
             "completeness": completeness_values[best_quality_idx],
             "quality": quality_values[best_quality_idx],
-            "scoring_threshold": best_scoring_threshold
+            "scoring_threshold": best_bin_threshold
         }
 
         # Results for other scoring thresholds
-        for i, scoring_thresh in enumerate(self._scoring_thresholds):
-            y_pred = y_pred_prob >= scoring_thresh
+        for i, bin_thresh in enumerate(self._bin_thresholds):
+            y_pred = y_pred_prob >= bin_thresh
             precision = precision_score(y_true, y_pred)
             recall = recall_score(y_true, y_pred)
 
-            results[f"precision_{scoring_thresh:.2f}"] = precision
-            results[f"recall_{scoring_thresh:.2f}"] = recall
-            results[f"f1_{scoring_thresh:.2f}"] = f1(precision, recall)
-            results[f"correctness_{scoring_thresh:.2f}"] = correctness_values[i]
-            results[f"completeness_{scoring_thresh:.2f}"] = completeness_values[i]
-            results[f"quality_{scoring_thresh:.2f}"] = quality_values[i]
+            results[f"precision_{bin_thresh:.2f}"] = precision
+            results[f"recall_{bin_thresh:.2f}"] = recall
+            results[f"f1_{bin_thresh:.2f}"] = f1(precision, recall)
+            results[f"correctness_{bin_thresh:.2f}"] = correctness_values[i]
+            results[f"completeness_{bin_thresh:.2f}"] = completeness_values[i]
+            results[f"quality_{bin_thresh:.2f}"] = quality_values[i]
 
         return results
