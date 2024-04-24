@@ -69,6 +69,7 @@ def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns o
         shuffle=config.TRAIN.SHUFFLE,
         num_workers=config_powerlines.data.num_workers.train,
         pin_memory=False,
+        persistent_workers=True,
         drop_last=True
     )
 
@@ -77,7 +78,9 @@ def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns o
         batch_size=config_powerlines.data.batch_size.val,
         shuffle=False,
         num_workers=config_powerlines.data.num_workers.val,
-        pin_memory=False
+        pin_memory=False,
+        persistent_workers=True,
+        drop_last=False
     )
 
     # criterion

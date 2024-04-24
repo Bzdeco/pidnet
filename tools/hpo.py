@@ -1,6 +1,9 @@
 from utils import seed
 seed.set_global_seeds()
 
+# import torch.multiprocessing
+# torch.multiprocessing.set_start_method("spawn", force=True)
+
 from powerlines.hpo import HyperparameterOptimizationCallback, fetch_run
 from tools.train import run_training
 

@@ -68,6 +68,8 @@ def train(
         if optimizer_config.adjust_lr:
             adjust_learning_rate(optimizer, optimizer_config.lr, num_iters, i_iter + cur_iters)
 
+        del images, labels, losses, acc, loss_list
+
     run["metrics/train/loss/total"].log(loss_meter.average())
     run["metrics/train/accuracy"].log(accuracy_meter.average())
 

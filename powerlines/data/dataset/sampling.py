@@ -36,6 +36,7 @@ class TrainCablesDetectionDataset(BaseDataset):
         self.sampling = sampling
 
         self.filepaths = load_filtered_filepaths(data_source)
+        self.timestamps = list(map(lambda path: int(path.stem), self.filepaths))
         self.annotations = load_annotations(data_source)
         self.num_frames = num_frames if num_frames is not None else len(self.filepaths)
 
@@ -53,7 +54,7 @@ class TrainCablesDetectionDataset(BaseDataset):
         )
 
         self._loading_data = self._frames_loading_data()
-        self.cache = parallelize(
+        parameters = parallelize(
             load_parameters_for_sampling,
             self._loading_data,
             num_workers,
@@ -61,7 +62,8 @@ class TrainCablesDetectionDataset(BaseDataset):
             use_threads=True
         )
         self.class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
-        self.sampling.configure_sampling(self.cache)
+        self.sampling.configure_sampling(parameters)
+        del parameters
 
     def _frames_loading_data(self) -> List[Dict[str, Any]]:
         return [self._single_frame_loading_data(frame_id) for frame_id in range(self.num_frames)]
@@ -79,7 +81,9 @@ class TrainCablesDetectionDataset(BaseDataset):
 
     def __getitem__(self, idx: int):
         frame_id = self.sampling.frame_idx_for_sample(idx)
-        frame = load_complete_frame(self.data_source, self.loading, self.cache[frame_id])
+        annotation = self.annotations[self.timestamps[frame_id]]
+        frame = load_complete_frame(annotation, self.data_source, self.sampling, self.loading)
+
         size = frame["image"].shape
         name = str(frame["timestamp"])
 
