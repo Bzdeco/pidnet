@@ -54,6 +54,7 @@ def val_dataset(config: DictConfig) -> Dataset:
         data_config=config.data,
         data_source=data_source(config, "val"),
         loading=loading(config),
+        sampling=sampling(config),
         num_frames=config.data.size.val
     )
 
