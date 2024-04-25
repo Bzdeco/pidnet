@@ -94,10 +94,10 @@ class HPORunner:
             Categorical("multi_scale_enabled", [False, True], default=True),
             Categorical("patch_size", [512, 1024], default=1024, ordered=True),
             Float("perturbation_fraction", (0.0, 0.875), default=0.375),
-            Float("negative_sample_prob", (0.0, 0.35), default=0.12),
+            Float("negative_sample_prob", (0.0, 0.25), default=0.12),
             Integer("batch_size", (2, 64), default=12, log=True),
             Categorical("ohem_enabled", [False, True], default=True),
-            Float("lr", (1e-5, 1e-1), default=1e-2, log=True),
+            Float("lr", (1e-5, 1e-2), default=1e-2, log=True),
             Float("wd", (1e-6, 1e-1), default=5e-4, log=True),
         ])
 
