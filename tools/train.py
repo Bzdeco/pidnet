@@ -157,7 +157,7 @@ if __name__ == '__main__':
     powerlines_cfg = powerlines_config()
     if args.fold is not None:
         fold = int(args.fold)
-        powerlines_cfg.cv_name = powerlines_cfg.cv_name
+        powerlines_cfg.cv_name = powerlines_cfg.name
         powerlines_cfg.name = f"{powerlines_cfg.name}-fold-{fold}"
         powerlines_cfg.data.cv.fold = fold
 
