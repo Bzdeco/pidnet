@@ -156,6 +156,9 @@ if __name__ == '__main__':
     # Set k-fold CV fold if given
     config = powerlines_config()
     if args.fold is not None:
-        config.data.cv.fold = int(args.fold)
+        fold = int(args.fold)
+        config.cv_name = config.cv_name
+        config.name = f"{config.name}-fold-{fold}"
+        config.data.cv.fold = fold
 
     run_training(config)
