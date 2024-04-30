@@ -154,11 +154,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Set k-fold CV fold if given
-    config = powerlines_config()
+    powerlines_cfg = powerlines_config()
     if args.fold is not None:
         fold = int(args.fold)
-        config.cv_name = config.cv_name
-        config.name = f"{config.name}-fold-{fold}"
-        config.data.cv.fold = fold
+        powerlines_cfg.cv_name = powerlines_cfg.cv_name
+        powerlines_cfg.name = f"{powerlines_cfg.name}-fold-{fold}"
+        powerlines_cfg.data.cv.fold = fold
 
-    run_training(config)
+    run_training(powerlines_cfg)
