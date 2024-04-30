@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
 # Modified based on https://github.com/HRNet/HRNet-Semantic-Segmentation
 # ------------------------------------------------------------------------------
-
+import argparse
 import os
 
 from pathlib import Path
@@ -55,7 +55,7 @@ def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns o
 
     run = create_neptune_run(config_powerlines.name, resume=False, from_run_id=None)
     output_folder = checkpoint_folder(config_powerlines, run_id(run))
-    run["config/powerlines"] = stringify_unsupported(config_powerlines)
+    run["config"] = stringify_unsupported(config_powerlines)
     run["config/pidnet"] = stringify_unsupported(dict(config))
 
     # cudnn related setting
@@ -149,4 +149,13 @@ def save_checkpoint(epoch: int, folder: Path, model: nn.Module, optimizer: Optim
 
 
 if __name__ == '__main__':
-    run_training(powerlines_config())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fold", required=False, type=int)
+    args = parser.parse_args()
+
+    # Set k-fold CV fold if given
+    config = powerlines_config()
+    if args.fold is not None:
+        config.data.cv.fold = int(args.fold)
+
+    run_training(config)
