@@ -1,7 +1,7 @@
 name: pidnet-cables
 cv_name: null
 
-epochs: 30
+epochs: 25
 optimized_metric: quality
 verbose: false
 
