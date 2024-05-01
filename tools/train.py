@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 import models
 from configs import config
 from configs import update_config
+from powerlines.data import seed
 from tools import factory
 from utils.criterion import CrossEntropy, OhemCrossEntropy, BoundaryLoss
 from utils.function import train, validate
@@ -71,7 +72,9 @@ def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns o
         num_workers=config_powerlines.data.num_workers.train,
         pin_memory=False,
         persistent_workers=True,
-        drop_last=True
+        drop_last=True,
+        worker_init_fn=seed.seed_worker,
+        generator=seed.torch_generator()
     )
 
     val_dataloader = DataLoader(
@@ -81,7 +84,9 @@ def run_training(config_powerlines: DictConfig) -> Optional[float]:  # returns o
         num_workers=config_powerlines.data.num_workers.val,
         pin_memory=False,
         persistent_workers=True,
-        drop_last=False
+        drop_last=False,
+        worker_init_fn=seed.seed_worker,
+        generator=seed.torch_generator()
     )
 
     # criterion
