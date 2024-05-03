@@ -2,7 +2,6 @@
 # Modified based on https://github.com/HRNet/HRNet-Semantic-Segmentation
 # ------------------------------------------------------------------------------
 import argparse
-import os
 
 from pathlib import Path
 from typing import Optional
