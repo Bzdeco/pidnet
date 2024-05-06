@@ -112,7 +112,8 @@ def run_training(
         )
     bd_criterion = BoundaryLoss()
 
-    pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
+    scale_factor = 8 / config_powerlines.data.downsampling_factor  # 8 is the default downsampling done by PIDNet
+    pidnet = models.pidnet.get_seg_model(config, scale_factor)  # creates a pretrained model by default
     model = FullModel(pidnet, semantic_seg_criterion, bd_criterion).cuda()
     optimizer = factory.optimizer(config_powerlines, model)
     scaler = amp.GradScaler(enabled=True)

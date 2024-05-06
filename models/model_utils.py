@@ -98,16 +98,13 @@ class segmenthead(nn.Module):
         self.scale_factor = scale_factor
 
     def forward(self, x):
-        
         x = self.conv1(self.relu(self.bn1(x)))
         out = self.conv2(self.relu(self.bn2(x)))
 
         if self.scale_factor is not None:
-            height = x.shape[-2] * self.scale_factor
-            width = x.shape[-1] * self.scale_factor
-            out = F.interpolate(out,
-                        size=[height, width],
-                        mode='bilinear', align_corners=algc)
+            height = int(x.shape[-2] * self.scale_factor)
+            width = int(x.shape[-1] * self.scale_factor)
+            out = F.interpolate(out, size=[height, width], mode="bilinear", align_corners=algc)
 
         return out
 

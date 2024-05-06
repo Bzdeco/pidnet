@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import time
 from .model_utils import BasicBlock, Bottleneck, segmenthead, DAPPM, PAPPM, PagFM, Bag, Light_Bag
-import logging
 
 BatchNorm2d = nn.BatchNorm2d
 bn_mom = 0.1
@@ -14,7 +13,7 @@ algc = False
 
 
 class PIDNet(nn.Module):
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, downsample=True):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, scale_factor=0.5):
         super(PIDNet, self).__init__()
         self.augment = augment
         
@@ -84,16 +83,10 @@ class PIDNet(nn.Module):
         
         # Prediction Head
         if self.augment:
-            self.seghead_p = segmenthead(planes * 2, head_planes, num_classes)
-            self.seghead_d = segmenthead(planes * 2, planes, 1)           
+            self.seghead_p = segmenthead(planes * 2, head_planes, num_classes, scale_factor=scale_factor)
+            self.seghead_d = segmenthead(planes * 2, planes, 1, scale_factor=scale_factor)
 
-        self.final_layer = segmenthead(planes * 4, head_planes, num_classes)
-
-        # Downsampling to common resolution
-        self.downsample = downsample
-        self.downsample_p = nn.Conv2d(num_classes, num_classes, kernel_size=2, stride=2)
-        self.downsample_d = nn.Conv2d(1, 1, kernel_size=2, stride=2)
-        self.downsample_main = nn.Conv2d(num_classes, num_classes, kernel_size=2, stride=2)
+        self.final_layer = segmenthead(planes * 4, head_planes, num_classes, scale_factor=scale_factor)
 
         # Layers initialization
         for m in self.modules():
@@ -170,38 +163,34 @@ class PIDNet(nn.Module):
         x_ = self.layer5_(self.relu(x_))
         x_d = self.layer5_d(self.relu(x_d))
         x = F.interpolate(
-                        self.spp(self.layer5(x)),
-                        size=[height_output, width_output],
-                        mode='bilinear', align_corners=algc)
+            self.spp(self.layer5(x)),
+            size=[height_output, width_output],
+            mode='bilinear', align_corners=algc
+        )
 
         x_ = self.final_layer(self.dfm(x_, x, x_d))
 
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
             x_extra_d = self.seghead_d(temp_d)
-
-            if self.downsample:
-                return [
-                    self.downsample_p(x_extra_p),
-                    self.downsample_main(x_),
-                    self.downsample_d(x_extra_d)
-                ]
-            else:
-                return [x_extra_p, x_, x_extra_d]
+            return [x_extra_p, x_, x_extra_d]
         else:
-            if self.downsample:
-                return self.downsample_main(x_)
-            else:
-                return x_
+            return x_
 
 
-def get_seg_model(cfg):
+def get_seg_model(cfg, scale_factor: float):
     if 's' in cfg.MODEL.NAME:
-        model = PIDNet(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=True)
+        model = PIDNet(
+            m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=True, scale_factor=scale_factor
+        )
     elif 'm' in cfg.MODEL.NAME:
-        model = PIDNet(m=2, n=3, num_classes=2, planes=64, ppm_planes=96, head_planes=128, augment=True)
+        model = PIDNet(
+            m=2, n=3, num_classes=2, planes=64, ppm_planes=96, head_planes=128, augment=True, scale_factor=scale_factor
+        )
     else:
-        model = PIDNet(m=3, n=4, num_classes=2, planes=64, ppm_planes=112, head_planes=256, augment=True)
+        model = PIDNet(
+            m=3, n=4, num_classes=2, planes=64, ppm_planes=112, head_planes=256, augment=True, scale_factor=scale_factor
+        )
 
     checkpoint_filepath = cfg.MODEL.PRETRAINED
     print(f"Loading pretrained model from {checkpoint_filepath}")
