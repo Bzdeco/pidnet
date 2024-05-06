@@ -13,7 +13,7 @@ algc = False
 
 
 class PIDNet(nn.Module):
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, scale_factor=0.5):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, scale_factor=None):
         super(PIDNet, self).__init__()
         self.augment = augment
         
@@ -165,7 +165,7 @@ class PIDNet(nn.Module):
         x = F.interpolate(
             self.spp(self.layer5(x)),
             size=[height_output, width_output],
-            mode='bilinear', align_corners=algc
+            mode="bilinear", align_corners=algc
         )
 
         x_ = self.final_layer(self.dfm(x_, x, x_d))
