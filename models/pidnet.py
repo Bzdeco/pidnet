@@ -178,7 +178,7 @@ class PIDNet(nn.Module):
             return x_
 
 
-def get_seg_model(cfg, scale_factor: float):
+def get_seg_model(cfg, scale_factor: float, pretrained: bool = True):
     if 's' in cfg.MODEL.NAME:
         model = PIDNet(
             m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=True, scale_factor=scale_factor
@@ -192,14 +192,15 @@ def get_seg_model(cfg, scale_factor: float):
             m=3, n=4, num_classes=2, planes=64, ppm_planes=112, head_planes=256, augment=True, scale_factor=scale_factor
         )
 
-    checkpoint_filepath = cfg.MODEL.PRETRAINED
-    print(f"Loading pretrained model from {checkpoint_filepath}")
-    pretrained_state = torch.load(checkpoint_filepath, map_location='cpu')['state_dict']
-    model_dict = model.state_dict()
-    pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
-    model_dict.update(pretrained_state)
-    print(f"> loaded {len(pretrained_state)} parameters")
-    model.load_state_dict(model_dict, strict=False)
+    if pretrained:
+        checkpoint_filepath = cfg.MODEL.PRETRAINED
+        print(f"Loading pretrained model from {checkpoint_filepath}")
+        pretrained_state = torch.load(checkpoint_filepath, map_location='cpu')['state_dict']
+        model_dict = model.state_dict()
+        pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
+        model_dict.update(pretrained_state)
+        print(f"> loaded {len(pretrained_state)} parameters")
+        model.load_state_dict(model_dict, strict=False)
 
     return model
 
