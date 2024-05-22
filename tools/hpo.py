@@ -130,7 +130,7 @@ class HPORunner:
             )
             return 1  # worst possible result
 
-        optimized_metric = run_training(hydra_config, self._goal)
+        optimized_metric = run_training(hydra_config)
 
         if self._goal == "maximize":
             return 1 - optimized_metric  # SMAC minimizes the target function
