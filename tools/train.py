@@ -131,7 +131,7 @@ def run_training(
     for epoch in range(first_epoch, n_epochs):
         train(run, config_powerlines, epoch, epoch_iters, num_iters, train_dataloader, optimizer, scaler, model)
         if validation_config.every:
-            metric_value = validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
+            metric_value = validate(epoch, config, config_powerlines, run, val_dataloader, model)
             best_metric_value = max(best_metric_value, metric_value)
         save_checkpoint(epoch, output_folder, model, optimizer, scaler)
 
