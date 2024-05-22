@@ -70,8 +70,8 @@ def train(
 
         del images, labels, losses, acc, loss_list
 
-    run["metrics/train/loss/total"].log(loss_meter.average())
-    run["metrics/train/accuracy"].log(accuracy_meter.average())
+    run["metrics/train/loss/total"].append(loss_meter.average(), step=epoch)
+    run["metrics/train/accuracy"].append(accuracy_meter.average(), step=epoch)
 
 
 def validate(
@@ -103,10 +103,10 @@ def validate(
             vis_logger.visualize(epoch, images, seg_predictions, labels)
 
     # Log metrics
-    run["metrics/val/loss/total"].log(loss_meter.average())
+    run["metrics/val/loss/total"].append(loss_meter.average(), step=epoch)
     metrics = seg_metrics.compute()
     for name, value in metrics.items():
-        run[f"metrics/val/{name}"].log(value)
+        run[f"metrics/val/{name}"].append(value, step=epoch)
 
     return metrics[config_powerlines.optimized_metric]
 
