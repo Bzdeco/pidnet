@@ -58,5 +58,5 @@ validation:
   last: false
 
 visualization:
-  n_images_per_epoch: 3
-  every: 1
+  n_images_per_epoch: 1
+  every: 100
