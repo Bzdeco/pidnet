@@ -59,19 +59,24 @@ class HyperparameterOptimizationCallback(Callback):
         self._current_trial += 1
 
         # Check for forbidden configuration trial results
-        trial_result = 1 - value.cost
-        if trial_result != 0:  # do not log forbidden configuration trials
-            # Log trial configuration
-            trial_config = dict(info.config)
-            epochs = int(info.budget)
-            self._run[f"trials/{self._current_trial}"] = stringify_unsupported(trial_config)
-            self._run[f"trials/{self._current_trial}/epochs"] = epochs
+        trial_result = [1 - cost for cost in value.cost]
 
-            # Log trial results
-            self._run[f"trials/{self._current_trial}/result"] = trial_result
-            self._run[f"results"].log(trial_result)
+        # Log trial configuration
+        trial_config = dict(info.config)
+        epochs = int(info.budget)
+        self._run[f"trials/{self._current_trial}"] = stringify_unsupported(trial_config)
+        self._run[f"trials/{self._current_trial}/epochs"] = epochs
 
-            # Update incumbent trial
-            incumbent = smbo.intensifier.get_incumbent()
-            if incumbent is not None and dict(incumbent) == trial_config:
-                self._run["incumbent_trial"] = self._current_trial
+        # Log trial results
+        self._run[f"trials/{self._current_trial}/result_cables"] = trial_result[0]
+        self._run[f"trials/{self._current_trial}/result_poles"] = trial_result[1]
+
+        # Log single averaged result
+        averaged_result = sum(trial_result) / len(trial_result)
+        self._run[f"trials/{self._current_trial}/result"] = averaged_result
+        self._run[f"results"].log(averaged_result)
+
+        # Update incumbent trial
+        incumbent = smbo.intensifier.get_incumbent()
+        if incumbent is not None and dict(incumbent) == trial_config:
+            self._run["incumbent_trial"] = self._current_trial

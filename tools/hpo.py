@@ -171,7 +171,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     name = args.name
-    metric = args.metric
+    metrics = args.metrics
     output = Path(args.output)
     n_trials = int(args.n_trials)
     n_workers = int(args.n_workers)
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     resume = bool(args.resume)
     print(
         f"Hyperparameter optimization - {name}:\n",
-        f"metric={metric}\n"
+        f"metrics={metrics}\n"
         f"output={output}\n"
         f"trials={n_trials}\n"
         f"workers={n_workers}\n"
@@ -191,7 +191,7 @@ if __name__ == '__main__':
 
     run_hyper_parameter_search(
         name,
-        metric,
+        metrics,
         output,
         n_trials,
         n_workers,
