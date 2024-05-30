@@ -4,7 +4,7 @@
 
 import logging
 import os
-from typing import List
+from typing import Dict
 
 import numpy as np
 from neptune import Run
@@ -78,7 +78,7 @@ def train(
 
 def validate(
     epoch: int, config, config_powerlines: DictConfig, run: Run, dataloader: DataLoader, model: nn.Module
-) -> List[float]:
+) -> Dict[str, float]:
     model.eval()
     torch.cuda.empty_cache()
 
@@ -125,7 +125,7 @@ def validate(
             run[f"metrics/val/{entity}/{name}"].append(value, step=epoch)
             all_metrics[f"{entity}/{name}"] = value
 
-    return [all_metrics[metric_name] for metric_name in config_powerlines.optimized_metrics]
+    return {metric_name: all_metrics[metric_name] for metric_name in config_powerlines.optimized_metrics}
 
 
 def testval(config, test_dataset, testloader, model,

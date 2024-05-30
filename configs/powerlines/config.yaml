@@ -57,9 +57,9 @@ paths:
   checkpoints: /scratch/cvlab/home/gwizdala/output/checkpoints
 
 validation:
-  every: true
-  last: false
+  every: false
+  last: true
 
 visualization:
-  n_images_per_epoch: 1
+  n_images_per_epoch: 0
   every: 100

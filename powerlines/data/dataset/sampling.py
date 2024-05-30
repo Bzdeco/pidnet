@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig, SamplingConfig
 from powerlines.data.utils import load_filtered_filepaths, sample_patch_center, load_annotations, \
-    load_parameters_for_sampling, load_complete_frame
+    load_parameters_for_sampling, load_complete_frame, CABLES_WEIGHTS, POLES_WEIGHTS
 from powerlines.utils import parallelize
 
 
@@ -62,8 +62,8 @@ class TrainCablesDetectionDataset(BaseDataset):
             use_threads=True
         )
 
-        self.cables_class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
-        self.poles_class_weights = torch.FloatTensor([]).cuda()  # TODO: compute these weights
+        self.cables_class_weights = torch.FloatTensor(CABLES_WEIGHTS).cuda()
+        self.poles_class_weights = torch.FloatTensor(POLES_WEIGHTS).cuda()
 
         self.sampling.configure_sampling(parameters)
         del parameters

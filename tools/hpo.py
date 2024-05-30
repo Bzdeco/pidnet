@@ -79,11 +79,9 @@ class HPORunner:
     def __init__(
         self,
         name: str,
-        optimized_metric: str,
         goal: str = "maximize"
     ):
         self.name = name
-        self._optimized_metric = optimized_metric
         self._goal = goal
 
     def configuration_space(self) -> ConfigurationSpace:
@@ -92,7 +90,6 @@ class HPORunner:
         config_space.add_hyperparameters([
             Float("color_jitter_magnitude", (0.0, 0.5), default=0.2),
             Categorical("multi_scale_enabled", [False, True], default=True),
-            Categorical("patch_size", [512, 1024], default=1024, ordered=True),
             Float("perturbation_fraction", (0.0, 0.875), default=0.375),
             Float("negative_sample_prob", (0.0, 0.25), default=0.12),
             Integer("batch_size", (2, 64), default=12, log=True),
@@ -109,38 +106,32 @@ class HPORunner:
             print(f"Trial overrides: {overrides}")
             hydra_config = compose(config_name="config", overrides=overrides)
             hydra_config.name = f"{self.name}"
-            hydra_config.optimized_metric = self._optimized_metric
             return hydra_config
 
     def default_config(self) -> DictConfig:
         with initialize(version_base=None, config_path="../configs/powerlines", job_name=self.name):
             config = compose(config_name="config")
-            config.optimized_metric = self._optimized_metric
             return config
 
-    def target_function(self, config: Configuration, seed: int = 0, budget: int = 5) -> float:
+    def target_function(self, config: Configuration, seed: int = 0, budget: int = 5) -> Dict[str, float]:
         # Train model and get best achieved result
         torch.cuda.empty_cache()
         hydra_config = self.hydra_config_from_hpc(config, epochs=int(budget))
 
-        if _check_is_forbidden_configuration(hydra_config):
-            print(
-                f"Forbidden configuration: "
-                f"patch_size={hydra_config.data.patch_size} batch_size={hydra_config.data.batch_size.train}"
-            )
-            return 1  # worst possible result
-
-        optimized_metric = run_training(hydra_config, self._goal)
+        optimized_metric = run_training(hydra_config)
 
         if self._goal == "maximize":
-            return 1 - optimized_metric  # SMAC minimizes the target function
+            return {
+                name: 1 - value  # SMAC minimizes the target function
+                for name, value in optimized_metric.items()
+            }
         else:
             return optimized_metric
 
 
 def run_hyper_parameter_search(
     name: str,
-    optimized_metric: str,
+    optimized_metrics: List[str],
     output_directory: Path,
     n_trials: int,
     n_workers: int,
@@ -151,11 +142,12 @@ def run_hyper_parameter_search(
 ):
     torch.cuda.empty_cache()
 
-    hpo_runner = HPORunner(name, optimized_metric)
+    hpo_runner = HPORunner(name)
 
     scenario = Scenario(
         hpo_runner.configuration_space(),
         name=hpo_runner.name,
+        objectives=optimized_metrics,
         output_directory=output_directory,
         deterministic=True,
         n_trials=n_trials,
@@ -182,7 +174,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--metric", default="quality")
+    parser.add_argument("--metrics", default=["cables/quality", "poles/quality"])
     parser.add_argument("--n_trials", default=500)
     parser.add_argument("--n_workers", default=1)
     parser.add_argument("--min_epochs", default=2)

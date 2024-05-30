@@ -13,6 +13,8 @@ from powerlines.data.config import DataSourceConfig, SamplingConfig, LoadingConf
 from powerlines.utils import load_npy, load_image
 
 INVALID_MASK_VALUE = np.iinfo(np.uint16).max
+CABLES_WEIGHTS = [1.0186, 54.7257]
+POLES_WEIGHTS = [1.0297, 34.6541]
 
 
 def load_filepaths(data_source_config) -> List[Path]:

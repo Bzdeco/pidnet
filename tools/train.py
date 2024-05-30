@@ -4,7 +4,7 @@
 import argparse
 
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, Dict
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -23,7 +23,7 @@ from configs import config
 from configs import update_config
 from powerlines.data import seed
 from tools import factory
-from utils.criterion import CrossEntropy, OhemCrossEntropy, BoundaryLoss
+from utils.criterion import CrossEntropy, OhemCrossEntropy
 from utils.function import train, validate
 from utils.utils import FullModel, checkpoint_folder, create_neptune_run, run_id
 
@@ -49,7 +49,7 @@ def run_training(
     config_powerlines: DictConfig,
     resume_run_id: Optional[int] = None,
     resume_epoch: Optional[int] = None
-) -> Optional[List[float]]:
+) -> Optional[Dict[str, float]]:
     update_config(config, default_commandline_arguments())
 
     import random
@@ -147,9 +147,10 @@ def run_training(
             if best_metric_values is None:
                 best_metric_values = optimized_metrics
             else:
-                best_metric_values = [
-                    max(best_before, new_value) for best_before, new_value in zip(best_metric_values, optimized_metrics)
-                ]
+                best_metric_values = {
+                    metric_name: max(best_metric_values[metric_name], optimized_metrics[metric_name])
+                    for metric_name in optimized_metrics.keys()
+                }
         save_checkpoint(epoch, output_folder, model, optimizer, scaler)
 
     if validation_config.last:

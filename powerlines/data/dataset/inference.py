@@ -6,7 +6,7 @@ from omegaconf import DictConfig
 
 from datasets.base_dataset import BaseDataset
 from powerlines.data.config import DataSourceConfig, LoadingConfig, SamplingConfig
-from powerlines.data.utils import load_filtered_filepaths, load_annotations, load_complete_frame
+from powerlines.data.utils import load_filtered_filepaths, load_annotations, load_complete_frame, CABLES_WEIGHTS, POLES_WEIGHTS
 
 
 class InferenceCablesDetectionDataset(BaseDataset):
@@ -38,8 +38,8 @@ class InferenceCablesDetectionDataset(BaseDataset):
             "timestamp": annotation.frame_timestamp(),
             "annotation": annotation
         } for annotation in self.annotations.values()]
-        self.cables_class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
-        self.poles_class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()  # TODO: fill with right values
+        self.cables_class_weights = torch.FloatTensor(CABLES_WEIGHTS).cuda()
+        self.poles_class_weights = torch.FloatTensor(POLES_WEIGHTS).cuda()
 
     def __getitem__(self, frame_id: int):
         annotation = self.annotations[self.timestamps[frame_id]]
