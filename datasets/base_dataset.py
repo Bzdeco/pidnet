@@ -89,7 +89,7 @@ class BaseDataset(data.Dataset):
         if edge is not None:
             edge = self.pad_image(edge, h, w, self.crop_size, (0.0,))
 
-        new_h, new_w = image.shape[-2:]
+        new_h, new_w = labels["cables"].shape
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
         image = image[y:y+self.crop_size[0], x:x+self.crop_size[1]]

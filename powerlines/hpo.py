@@ -75,8 +75,3 @@ class HyperparameterOptimizationCallback(Callback):
         averaged_result = sum(trial_result) / len(trial_result)
         self._run[f"trials/{self._current_trial}/result"] = averaged_result
         self._run[f"results"].log(averaged_result)
-
-        # Update incumbent trial
-        incumbent = smbo.intensifier.get_incumbent()
-        if incumbent is not None and dict(incumbent) == trial_config:
-            self._run["incumbent_trial"] = self._current_trial
