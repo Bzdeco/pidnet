@@ -20,16 +20,13 @@ import torch
 import torch.nn as nn
 from neptune import Run
 from omegaconf import DictConfig
-from torch import ModuleDict
 
 
 class FullModel(nn.Module):
-    def __init__(self, model: nn.Module, semantic_seg_losses: ModuleDict, poles_weight: float = 1.0):
+    def __init__(self, model: nn.Module, semantic_seg_losses: Dict[str, nn.Module], poles_weight: float = 1.0):
         super(FullModel, self).__init__()
         self.model = model
         self.sem_seg_losses = semantic_seg_losses
-
-        self.entity_to_channel = {"cables": 0, "poles": 1}
         self.weights = {"cables": 1.0, "poles": poles_weight}
 
     def pixel_acc(self, pred, label):
@@ -43,26 +40,21 @@ class FullModel(nn.Module):
     def forward(self, inputs: torch.Tensor, labels: Dict[str, torch.Tensor], *args, **kwargs):
         outputs = self.model(inputs, *args, **kwargs)
 
-        loss = None
+        losses = {}
         accuracies = {}
         predictions = {}
         for entity, sem_seg_loss in self.sem_seg_losses.items():
-            channel = self.entity_to_channel[entity]
             weight = self.weights[entity]
-            dense_pred_segmentation = outputs["p"][..., channel, :, :]
-            coarse_pred_segmentation = outputs["main"][..., channel, :, :]
+            dense_pred_segmentation = outputs[entity]["p"]
+            coarse_pred_segmentation = outputs[entity]["main"]
 
             accuracies[entity] = self.pixel_acc(dense_pred_segmentation, labels[entity])
-            seg_loss = weight * sem_seg_loss([dense_pred_segmentation, coarse_pred_segmentation], labels[entity])
-
-            if loss is None:
-                loss = seg_loss
-            else:
-                loss += seg_loss
+            losses[entity] = weight * sem_seg_loss([dense_pred_segmentation, coarse_pred_segmentation], labels[entity])
 
             predictions[entity] = {"p": dense_pred_segmentation, "main": coarse_pred_segmentation}
 
-        return torch.unsqueeze(loss, 0), predictions, accuracies
+        loss = sum(losses.values())
+        return torch.unsqueeze(loss, 0), predictions, accuracies, losses
 
 
 class AverageMeter(object):

@@ -98,7 +98,7 @@ def run_training(
     if ohem_config.enabled:
         print("Using OHEM in loss function")
         min_kept = int(ohem_config.keep_fraction * (config_powerlines.data.patch_size ** 2))
-        semantic_seg_criterion = ModuleDict({
+        semantic_seg_criterion = {
             "cables": OhemCrossEntropy(
                 ignore_label=config.TRAIN.IGNORE_LABEL,
                 thres=ohem_config.threshold,
@@ -111,9 +111,9 @@ def run_training(
                 min_kept=min_kept,
                 weight=train_dataset.poles_class_weights
             )
-        })
+        }
     else:
-        semantic_seg_criterion = ModuleDict({
+        semantic_seg_criterion = {
             "cables": CrossEntropy(
                 ignore_label=config.TRAIN.IGNORE_LABEL,
                 weight=train_dataset.cables_class_weights
@@ -122,7 +122,7 @@ def run_training(
                 ignore_label=config.TRAIN.IGNORE_LABEL,
                 weight=train_dataset.poles_class_weights
             )
-        })
+        }
 
     pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
     model = FullModel(pidnet, semantic_seg_criterion, poles_weight=config_powerlines.loss.poles_weight).cuda()

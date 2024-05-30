@@ -85,9 +85,13 @@ class PIDNet(nn.Module):
         
         # Prediction head, downsampling to common resolution with the scale factor
         if self.augment:
-            self.seghead_p = segmenthead(planes * 2, head_planes, num_classes, scale_factor=0.5)
-            self.seghead_d = segmenthead(planes * 2, planes, 1, scale_factor=0.5)
-        self.final_layer = segmenthead(planes * 4, head_planes, num_classes, scale_factor=0.5)
+            self.seghead_p_cables = segmenthead(planes * 2, head_planes, 2, scale_factor=0.5)
+            self.seghead_p_poles = segmenthead(planes * 2, head_planes, 2, scale_factor=0.5)
+            self.seghead_d_cables = segmenthead(planes * 2, planes, 1, scale_factor=0.5)
+            self.seghead_d_poles = segmenthead(planes * 2, planes, 1, scale_factor=0.5)
+
+        self.final_layer_cables = segmenthead(planes * 4, head_planes, 2, scale_factor=0.5)
+        self.final_layer_poles = segmenthead(planes * 4, head_planes, 2, scale_factor=0.5)
 
         # Layers initialization
         for m in self.modules():
@@ -130,7 +134,7 @@ class PIDNet(nn.Module):
         
         return layer
 
-    def forward(self, x) -> Dict[str, torch.Tensor]:
+    def forward(self, x) -> Dict[str, Dict[str, torch.Tensor]]:
         width_output = x.shape[-1] // 8
         height_output = x.shape[-2] // 8
 
@@ -168,18 +172,31 @@ class PIDNet(nn.Module):
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
 
-        x_ = self.final_layer(self.dfm(x_, x, x_d))
+        bagged = self.dfm(x_, x, x_d)
+        cables_x_ = self.final_layer_cables(bagged)
+        poles_x_ = self.final_layer_poles(bagged)
 
         if self.augment: 
-            x_extra_p = self.seghead_p(temp_p)
-            x_extra_d = self.seghead_d(temp_d)
+            cables_x_extra_p = self.seghead_p_cables(temp_p)
+            poles_x_extra_p = self.seghead_p_poles(temp_p)
+
+            cables_x_extra_d = self.seghead_d_cables(temp_d)
+            poles_x_extra_d = self.seghead_d_poles(temp_d)
+
             return {
-                "p": x_extra_p,
-                "main": x_,
-                "d": x_extra_d
+                "cables": {
+                    "p": cables_x_extra_p,
+                    "main": cables_x_,
+                    "d": cables_x_extra_d
+                },
+                "poles": {
+                    "p": poles_x_extra_p,
+                    "main": poles_x_,
+                    "d": poles_x_extra_d
+                }
             }
         else:
-            return {"main": x_}
+            return {"cables": {"main": cables_x_}, "poles": {"main": poles_x_}}
 
 
 def get_seg_model(cfg):

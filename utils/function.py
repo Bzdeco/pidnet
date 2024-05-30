@@ -39,7 +39,7 @@ def train(
     model.train()
     torch.cuda.empty_cache()
 
-    loss_meter = AverageMeter()
+    loss_meter = {"cables": AverageMeter(), "poles": AverageMeter(), "total": AverageMeter()}
     accuracy_meters = {"cables": AverageMeter(), "poles": AverageMeter()}
     cur_iters = epoch * epoch_iters
 
@@ -52,16 +52,20 @@ def train(
         }
 
         with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True, cache_enabled=True):
-            losses, _, accuracies = model(images, labels)
-            loss = losses.mean()
+            total_loss, _, accuracies, losses = model(images, labels)
+            loss = total_loss.mean()
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
 
-        # update average loss
-        loss_meter.update(loss.item())
+        # Update loss metrics
+        for entity, loss_value in losses.items():
+            loss_meter[entity].update(loss_value.mean().item())
+        loss_meter["total"].update(loss.item())
+
+        # Update accuracy metrics
         for entity, acc in accuracies.items():
             accuracy_meters[entity].update(acc.item())
 
@@ -69,9 +73,11 @@ def train(
         if optimizer_config.adjust_lr:
             adjust_learning_rate(optimizer, optimizer_config.lr, num_iters, i_iter + cur_iters)
 
-        del images, labels, losses, accuracies
+        del images, labels, total_loss, accuracies
 
-    run["metrics/train/loss/total"].append(loss_meter.average(), step=epoch)
+    run["metrics/train/loss/total"].append(loss_meter["total"].average(), step=epoch)
+    run["metrics/train/loss/cables"].append(loss_meter["cables"].average(), step=epoch)
+    run["metrics/train/loss/poles"].append(loss_meter["poles"].average(), step=epoch)
     run["metrics/train/accuracy/cables"].append(accuracy_meters["cables"].average(), step=epoch)
     run["metrics/train/accuracy/poles"].append(accuracy_meters["poles"].average(), step=epoch)
 
@@ -82,7 +88,7 @@ def validate(
     model.eval()
     torch.cuda.empty_cache()
 
-    loss_meter = AverageMeter()
+    loss_meter = {"cables": AverageMeter(), "poles": AverageMeter(), "total": AverageMeter()}
     seg_metrics = {
         "cables": segmentation_metrics(),
         "poles": segmentation_metrics()
@@ -104,20 +110,28 @@ def validate(
 
             # Inference
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True, cache_enabled=True):
-                losses, predictions, _ = model(images, labels)
+                total_loss, predictions, _, losses = model(images, labels)
 
-            # Update metrics
+            # Update segmentation metrics
             vis_predictions = {}
             for entity, seg_metric in seg_metrics.items():
                 seg_prediction = predictions[entity]["main"]
                 vis_predictions[entity] = seg_prediction
                 seg_metric(seg_prediction, labels[entity])
 
-            loss_meter.update(losses.mean().item())
+            # Update losses
+            for entity, loss_value in losses.items():
+                loss_meter[entity].update(loss_value.mean().item())
+            loss_meter["total"].update(total_loss.mean().item())
+
             vis_logger.visualize(epoch, images, vis_predictions, labels)
 
-    # Log metrics
-    run["metrics/val/loss/total"].append(loss_meter.average(), step=epoch)
+    # Log loss metrics
+    run["metrics/val/loss/total"].append(loss_meter["total"].average(), step=epoch)
+    run["metrics/val/loss/cables"].append(loss_meter["cables"].average(), step=epoch)
+    run["metrics/val/loss/poles"].append(loss_meter["poles"].average(), step=epoch)
+
+    # Log segmentation metrics
     all_metrics = {}
     for entity, seg_metric in seg_metrics.items():
         metrics = seg_metric.compute()

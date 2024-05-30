@@ -3,7 +3,7 @@ from xml.etree.ElementTree import Element, parse
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
 import shapely
@@ -93,11 +93,57 @@ class CableLine:
         return np.sqrt(((points_npy[1:] - points_npy[:-1]) ** 2).sum(axis=1)).sum()
 
 
+class PowerlinePoleType(Enum):
+    TOWER = 0
+    STICK = 1
+
+    @staticmethod
+    def parse(powerline_pole_node: Element) -> "PowerlinePoleType":
+        if powerline_pole_node.attrib["label"] == "Tower":
+            return PowerlinePoleType.TOWER
+        elif powerline_pole_node.attrib["label"] == "Stick":
+            return PowerlinePoleType.STICK
+        else:
+            raise ValueError(f"Unexpected powerline pole label '{powerline_pole_node.attrib['label']}'")
+
+
+@dataclass
+class PowerlinePole:
+    top_left: Tuple[float, float]
+    bottom_right: Tuple[float, float]
+    type: PowerlinePoleType
+
+    @staticmethod
+    def parse(powerline_pole_node: Element) -> "PowerlinePole":
+        top_left = float(powerline_pole_node.attrib["ytl"]), float(powerline_pole_node.attrib["xtl"])
+        bottom_right = float(powerline_pole_node.attrib["ybr"]), float(powerline_pole_node.attrib["xbr"])
+        powerline_pole_type = PowerlinePoleType.parse(powerline_pole_node)
+        return PowerlinePole(top_left, bottom_right, powerline_pole_type)
+
+    def is_tower(self):
+        return self.type == PowerlinePoleType.TOWER
+
+    def is_stick(self):
+        return self.type == PowerlinePoleType.STICK
+
+    def height(self):
+        return self.bottom_right[0] - self.top_left[0]
+
+    def width(self):
+        return self.bottom_right[1] - self.top_left[1]
+
+    def center_xy(self) -> List[float]:
+        top, left = self.top_left
+        bottom, right = self.bottom_right
+        return [left + (right - left) / 2, top + (bottom - top) / 2]
+
+
 @dataclass
 class ImageAnnotations:
     relative_image_path: Path
     exclusion_zones: List[ExclusionZone]
     cable_lines: List[CableLine]
+    powerline_poles: List[PowerlinePole]
 
     @staticmethod
     def parse(image_node: Element) -> "ImageAnnotations":
@@ -113,10 +159,16 @@ class ImageAnnotations:
             if line_type != LineType.NOT_CABLE
         ]
 
+        powerline_poles = [
+            PowerlinePole.parse(power_line_node) for power_line_node in image_node.findall("box")
+            if power_line_node.attrib["label"] == "Tower" or power_line_node.attrib["label"] == "Stick"
+        ]
+
         return ImageAnnotations(
             relative_image_path,
             exclusion_zones,
-            cable_lines
+            cable_lines,
+            powerline_poles
         )
 
     def visible_cables(self) -> List[CableLine]:
@@ -131,6 +183,12 @@ class ImageAnnotations:
             return list(filter(lambda cable: cable.is_visible_or_inferred(), self.cable_lines))
         else:
             raise ValueError(f"Unknown cable selector '{selector}'")
+
+    def poles(self, max_height: Optional[float] = None):
+        if max_height is None:
+            return self.powerline_poles
+        else:
+            return list(filter(lambda pole: pole.height() <= max_height, self.powerline_poles))
 
     def frame_timestamp(self) -> int:
         return int(self.relative_image_path.stem)

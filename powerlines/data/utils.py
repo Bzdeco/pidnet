@@ -245,7 +245,7 @@ def load_complete_frame(
         "timestamp": timestamp,
         "image": frame_image,
         "labels_cables": labels_cables,
-        "labels_poles": nevbw_labels_from_distance_mask(poles_distance_mask),
+        "labels_poles": nevbw_labels_from_distance_mask(poles_distance_mask[0]),
         "distance_mask": distance_masks["distance_mask"],
         "poles_distance_mask": poles_distance_mask,
         "exclusion_zones_distance_mask": distance_masks["exclusion_zones_distance_mask"],
