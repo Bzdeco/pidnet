@@ -61,7 +61,10 @@ class TrainCablesDetectionDataset(BaseDataset):
             f"Loading {data_source.data_source_subset} frames for configuration",
             use_threads=True
         )
-        self.class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
+
+        self.cables_class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
+        self.poles_class_weights = torch.FloatTensor([]).cuda()  # TODO: compute these weights
+
         self.sampling.configure_sampling(parameters)
         del parameters
 
@@ -94,15 +97,19 @@ class TrainCablesDetectionDataset(BaseDataset):
 
         y, x = sample_patch_center(patch_centers_data, self.sampling.non_sky_bias)
         image = self._extract_patch(frame["image"], y, x)
-        labels = self._extract_patch(frame["labels"], y, x)
+        labels = {
+            "cables": self._extract_patch(frame["labels_cables"], y, x),
+            "poles": self._extract_patch(frame["labels_poles"], y, x)
+        }
 
         image, labels, edge = self.generate_sample(
-            image, labels, generate_edge=False, use_multi_scale=self.use_multi_scale, use_flipping=self.use_flipping
+            image, labels, use_multi_scale=self.use_multi_scale, use_flipping=self.use_flipping
         )
 
         sample = {
             "image": image,
-            "labels": labels,
+            "labels_cables": labels["cables"],
+            "labels_poles": labels["poles"],
             "size": np.array(size),
             "name": name
         }

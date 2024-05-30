@@ -179,3 +179,7 @@ def num_samples_for_single_cable(cable: CableLine, patch_size: int) -> int:
 
 def num_cable_samples_in_frame(cables: List[CableLine], patch_size: int) -> int:
     return sum(map(lambda cable: num_samples_for_single_cable(cable, patch_size), cables))
+
+
+def num_pole_samples_in_frame(frame_annotation: ImageAnnotations) -> int:
+    return len(frame_annotation.poles())

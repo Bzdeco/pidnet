@@ -23,6 +23,7 @@ def data_source(config: DictConfig, subset: str) -> DataSourceConfig:
 def loading(config: DictConfig) -> LoadingConfig:
     return LoadingConfig(
         distance_mask=True,
+        poles_distance_mask=True,
         exclusion_area_mask=True,
         labels=True
     )

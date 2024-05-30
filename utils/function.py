@@ -4,6 +4,7 @@
 
 import logging
 import os
+from typing import List
 
 import numpy as np
 from neptune import Run
@@ -33,27 +34,26 @@ def train(
     dataloader: DataLoader,
     optimizer: torch.optim.Optimizer,
     scaler: GradScaler,
-    model
+    model: nn.Module
 ):
     model.train()
     torch.cuda.empty_cache()
 
     loss_meter = AverageMeter()
-    accuracy_meter = AverageMeter()
+    accuracy_meters = {"cables": AverageMeter(), "poles": AverageMeter()}
     cur_iters = epoch * epoch_iters
 
     iterator = tqdm(dataloader, desc="Training") if config_powerlines.verbose else dataloader
     for i_iter, batch in enumerate(iterator):
         images = batch["image"].cuda()
-        bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
-
-        labels = batch["labels"].cuda()
-        labels = downsample_labels(labels.float(), grid_size=16, adjust_to_divisible=False).long()
+        labels = {
+            "cables": downsample_labels(batch["labels_cables"].cuda().float(), grid_size=16, adjust_to_divisible=False).long(),
+            "poles": downsample_labels(batch["labels_poles"].cuda().float(), grid_size=16, adjust_to_divisible=False).long()
+        }
 
         with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True, cache_enabled=True):
-            losses, _, acc, loss_list = model(images, labels, bd_gts)
+            losses, _, accuracies = model(images, labels)
             loss = losses.mean()
-            acc = acc.mean()
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -62,53 +62,70 @@ def train(
 
         # update average loss
         loss_meter.update(loss.item())
-        accuracy_meter.update(acc.item())
+        for entity, acc in accuracies.items():
+            accuracy_meters[entity].update(acc.item())
 
         optimizer_config = config_powerlines.optimizer
         if optimizer_config.adjust_lr:
             adjust_learning_rate(optimizer, optimizer_config.lr, num_iters, i_iter + cur_iters)
 
-        del images, labels, losses, acc, loss_list
+        del images, labels, losses, accuracies
 
     run["metrics/train/loss/total"].append(loss_meter.average(), step=epoch)
-    run["metrics/train/accuracy"].append(accuracy_meter.average(), step=epoch)
+    run["metrics/train/accuracy/cables"].append(accuracy_meters["cables"].average(), step=epoch)
+    run["metrics/train/accuracy/poles"].append(accuracy_meters["poles"].average(), step=epoch)
 
 
 def validate(
     epoch: int, config, config_powerlines: DictConfig, run: Run, dataloader: DataLoader, model: nn.Module
-) -> float:
+) -> List[float]:
     model.eval()
     torch.cuda.empty_cache()
 
     loss_meter = AverageMeter()
-    seg_metrics = segmentation_metrics()
+    seg_metrics = {
+        "cables": segmentation_metrics(),
+        "poles": segmentation_metrics()
+    }
     vis_logger = VisualizationLogger(run, config_powerlines)
 
     with torch.no_grad():
         iterator = tqdm(dataloader, desc="Validating") if config_powerlines.verbose else dataloader
         for idx, batch in enumerate(iterator):
             images = batch["image"].cuda()
-            bd_gts = batch["edge"].float().cuda() if "edge" in batch else None
-            labels = batch["labels"].cuda()
-            labels = downsample_labels(labels.float(), grid_size=16, adjust_to_divisible=False).long()
+            labels = {
+                "cables": downsample_labels(
+                    batch["labels_cables"].cuda().float(), grid_size=16, adjust_to_divisible=False
+                ).long(),
+                "poles": downsample_labels(
+                    batch["labels_poles"].cuda().float(), grid_size=16, adjust_to_divisible=False
+                ).long()
+            }
 
             # Inference
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True, cache_enabled=True):
-                losses, predictions, _, _ = model(images, labels, bd_gts)
+                losses, predictions, _ = model(images, labels)
 
             # Update metrics
-            seg_predictions = predictions[config.TEST.OUTPUT_INDEX]
-            seg_metrics(seg_predictions, labels)
+            vis_predictions = {}
+            for entity, seg_metric in seg_metrics.items():
+                seg_prediction = predictions[entity]["main"]
+                vis_predictions[entity] = seg_prediction
+                seg_metric(seg_prediction, labels[entity])
+
             loss_meter.update(losses.mean().item())
-            vis_logger.visualize(epoch, images, seg_predictions, labels)
+            vis_logger.visualize(epoch, images, vis_predictions, labels)
 
     # Log metrics
     run["metrics/val/loss/total"].append(loss_meter.average(), step=epoch)
-    metrics = seg_metrics.compute()
-    for name, value in metrics.items():
-        run[f"metrics/val/{name}"].append(value, step=epoch)
+    all_metrics = {}
+    for entity, seg_metric in seg_metrics.items():
+        metrics = seg_metric.compute()
+        for name, value in metrics.items():
+            run[f"metrics/val/{entity}/{name}"].append(value, step=epoch)
+            all_metrics[f"{entity}/{name}"] = value
 
-    return metrics[config_powerlines.optimized_metric]
+    return [all_metrics[metric_name] for metric_name in config_powerlines.optimized_metrics]
 
 
 def testval(config, test_dataset, testloader, model,

@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from powerlines.data.annotations import ImageAnnotations, num_cable_samples_in_frame
+from powerlines.data.annotations import ImageAnnotations, num_cable_samples_in_frame, num_pole_samples_in_frame
 from powerlines.data.config import DataSourceConfig, SamplingConfig, LoadingConfig, _filter_excluded_filepaths, \
     _filter_selected_filepaths
 from powerlines.utils import load_npy, load_image
@@ -157,16 +157,21 @@ def load_distance_masks(
 ) -> Dict[str, Optional[np.ndarray]]:
     filename = f"{frame_timestamp}.npy"
 
-    frame_distance_mask = load_npy(
+    cables_distance_mask = load_npy(
         data_source_config.distance_masks_folder / filename
     ) if loading_config.distance_mask else None
+
+    poles_distance_mask = load_npy(
+        data_source_config.poles_distance_masks_folder / filename
+    ) if loading_config.poles_distance_mask else None
 
     exclusion_zones_distance_mask = load_npy(
         data_source_config.exclusion_zones_distance_masks_folder / filename
     ) if loading_config.exclusion_area_mask else None
 
     return {
-        "distance_mask": frame_distance_mask,
+        "distance_mask": cables_distance_mask,
+        "poles_distance_mask": poles_distance_mask,
         "exclusion_zones_distance_mask": exclusion_zones_distance_mask
     }
 
@@ -190,9 +195,12 @@ def frame_parameters(
     sampling: SamplingConfig,
     distance_masks: Dict[str, Any]
 ):
-    # Sample relative to cables
-    sampling_source_distance_mask = distance_masks["distance_mask"]
-    num_positive_samples = num_cable_samples_in_frame(annotation.cables("visible"), sampling.patch_size)
+    # Sample relative to cables and poles combined in a single distance mask
+    sampling_source_distance_mask = np.minimum(distance_masks["distance_mask"], distance_masks["poles_distance_mask"])
+    num_positive_samples = max(
+        num_cable_samples_in_frame(annotation.cables("visible"), sampling.patch_size),
+        num_pole_samples_in_frame(annotation)
+    )
 
     positive_patch_centers_data = positive_sampled_patch_centers_data(
         annotation,
@@ -228,13 +236,16 @@ def load_complete_frame(
     timestamp = annotation.frame_timestamp()
     frame_image = load_npy(data_source.input_filepath(timestamp))
     distance_masks = load_distance_masks(data_source, loading, timestamp)
-    labels = load_processed_label_image(data_source.labels_folder / f"{timestamp}.png") if loading.labels else None
+    labels_cables = load_processed_label_image(data_source.labels_folder / f"{timestamp}.png") if loading.labels else None
+    poles_distance_mask = distance_masks["poles_distance_mask"]
 
     return {
         "timestamp": timestamp,
         "image": frame_image,
-        "labels": labels,
+        "labels_cables": labels_cables,
+        "labels_poles": nevbw_labels_from_distance_mask(poles_distance_mask),
         "distance_mask": distance_masks["distance_mask"],
+        "poles_distance_mask": poles_distance_mask,
         "exclusion_zones_distance_mask": distance_masks["exclusion_zones_distance_mask"],
         **frame_parameters(annotation, sampling, distance_masks)
     }
@@ -332,3 +343,17 @@ def downsample_labels(labels: torch.Tensor, grid_size: int, adjust_to_divisible:
         (batch_size, height // grid_size * 2, width // grid_size * 2)
     )
     return _downsampler(grid_centers.unsqueeze(1)).squeeze(1)
+
+
+GRID_SIZE = 16
+NEVBW_MAX_CELLS_AWAY = 2
+
+
+def nevbw_labels_from_distance_mask(
+    distance_mask: np.ndarray, grid_size: int = GRID_SIZE, max_cells_away: int = NEVBW_MAX_CELLS_AWAY
+) -> np.ndarray:
+    """
+    Method used to obtain labels from distance mask based on the method description in Stambler et al. paper
+    """
+
+    return distance_mask <= max_cells_away * grid_size  # within max_cells_away grid cells distance

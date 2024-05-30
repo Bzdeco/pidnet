@@ -2,7 +2,9 @@ name: pidnet-cables
 cv_name: null
 
 epochs: 30
-optimized_metric: quality
+optimized_metrics:
+  - cables/quality
+  - poles/quality
 verbose: false
 
 data:
@@ -37,6 +39,7 @@ data:
     val: null
 
 loss:
+  poles_weight: 1.0
   ohem:
     enabled: true
     threshold: 0.9

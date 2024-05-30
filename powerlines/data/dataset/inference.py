@@ -38,7 +38,8 @@ class InferenceCablesDetectionDataset(BaseDataset):
             "timestamp": annotation.frame_timestamp(),
             "annotation": annotation
         } for annotation in self.annotations.values()]
-        self.class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
+        self.cables_class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()
+        self.poles_class_weights = torch.FloatTensor([1.0186, 54.7257]).cuda()  # TODO: fill with right values
 
     def __getitem__(self, frame_id: int):
         annotation = self.annotations[self.timestamps[frame_id]]
@@ -47,15 +48,17 @@ class InferenceCablesDetectionDataset(BaseDataset):
         size = frame["image"].shape
 
         image = frame["image"]
-        labels = frame["labels"]
+        labels = {
+            "cables": frame["labels_cables"],
+            "poles": frame["labels_poles"]
+        }
 
-        image, labels, edge = self.generate_sample(
-            image, labels, generate_edge=False, use_multi_scale=False, use_flipping=False, edge_pad=False
-        )
+        image, labels, edge = self.generate_sample(image, labels, use_multi_scale=False, use_flipping=False)
 
         sample = {
             "image": image,
-            "labels": labels,
+            "labels_cables": labels["cables"],
+            "labels_poles": labels["poles"],
             "size": np.array(size),
             "name": name
         }

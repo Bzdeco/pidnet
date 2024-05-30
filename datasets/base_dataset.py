@@ -1,6 +1,8 @@
 # ------------------------------------------------------------------------------
 # Modified based on https://github.com/HRNet/HRNet-Semantic-Segmentation
 # ------------------------------------------------------------------------------
+from typing import Dict
+
 import cv2
 import numpy as np
 import random
@@ -60,8 +62,11 @@ class BaseDataset(data.Dataset):
         image /= self.std
         return image
 
-    def label_transform(self, label):
-        return np.array(label).astype(np.uint8)
+    def label_transform(self, labels):
+        return {
+            entity: np.array(label).astype(np.uint8)
+            for entity, label in labels.items()
+        }
 
     def pad_image(self, image, h, w, size, padvalue):
         pad_image = image.copy()
@@ -74,24 +79,28 @@ class BaseDataset(data.Dataset):
 
         return pad_image
 
-    def rand_crop(self, image, label, edge):
+    def rand_crop(self, image, labels, edge):
         h, w = image.shape[:-1]
         image = self.pad_image(image, h, w, self.crop_size, (0.0, 0.0, 0.0))
-        label = self.pad_image(label, h, w, self.crop_size, (self.ignore_label,))
+        labels = {
+            entity: self.pad_image(label, h, w, self.crop_size, (self.ignore_label,))
+            for entity, label in labels.items()
+        }
         if edge is not None:
             edge = self.pad_image(edge, h, w, self.crop_size, (0.0,))
 
-        new_h, new_w = label.shape
+        new_h, new_w = image.shape[-2:]
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
         image = image[y:y+self.crop_size[0], x:x+self.crop_size[1]]
-        label = label[y:y+self.crop_size[0], x:x+self.crop_size[1]]
-        if edge is not None:
-            edge = edge[y:y+self.crop_size[0], x:x+self.crop_size[1]]
+        labels = {
+            entity: label[y:y+self.crop_size[0], x:x+self.crop_size[1]]
+            for entity, label in labels.items()
+        }
 
-        return image, label, edge
+        return image, labels, edge
 
-    def multi_scale_aug(self, image, label=None, edge=None, rand_scale=1.0, rand_crop=True):
+    def multi_scale_aug(self, image, labels=None, edge=None, rand_scale=1.0, rand_crop=True):
         long_size = int(self.base_size * rand_scale + 0.5)
         h, w = image.shape[:2]
 
@@ -104,56 +113,46 @@ class BaseDataset(data.Dataset):
 
         # Channel last for resizing: https://stackoverflow.com/a/69348858
         image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
-        if label is not None:
-            label = cv2.resize(label.astype(int), (new_w, new_h), interpolation=cv2.INTER_NEAREST).astype(bool)
-            if edge is not None:
-                edge = cv2.resize(edge.astype(int), (new_w, new_h), interpolation=cv2.INTER_NEAREST).astype(bool)
+        if labels is not None:
+            labels = {
+                entity: cv2.resize(label.astype(int), (new_w, new_h), interpolation=cv2.INTER_NEAREST).astype(bool)
+                for entity, label in labels.items()
+            }
         else:
             return image
 
         if rand_crop:
-            image, label, edge = self.rand_crop(image, label, edge)
+            image, labels, edge = self.rand_crop(image, labels, edge)
 
-        return image, label, edge
+        return image, labels, edge
 
     def generate_sample(
         self,
         image: np.ndarray,
-        label: np.ndarray,
-        generate_edge: bool = False,
+        labels: Dict[str, np.ndarray],
         use_multi_scale: bool = True,
         use_flipping: bool = True,
-        edge_pad=True,
-        edge_size=4
     ):
-        if generate_edge:
-            edge = cv2.Canny(label, 0.1, 0.2)
-            kernel = np.ones((edge_size, edge_size), np.uint8)
-            if edge_pad:
-                edge = edge[y_k_size:-y_k_size, x_k_size:-x_k_size]
-                edge = np.pad(edge, ((y_k_size, y_k_size), (x_k_size, x_k_size)), mode='constant')
-            edge = (cv2.dilate(edge, kernel, iterations=1) > 50) * 1.0
-        else:
-            edge = None
-
+        edge = None
         image = channel_last(image)
 
         if use_multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
-            image, label, edge = self.multi_scale_aug(image, label, edge, rand_scale=rand_scale)
+            image, labels, edge = self.multi_scale_aug(image, labels, edge, rand_scale=rand_scale)
 
         image = channel_first(self.input_transform(image))
-        label = self.label_transform(label)
+        labels = self.label_transform(labels)
 
         # Horizontal flipping, copy to fix negative strides
         if use_flipping:
             flip = np.random.choice(2) * 2 - 1
             image = image[:, :, ::flip].copy()
-            label = label[:, ::flip].copy()
-            if edge is not None:
-                edge = edge[:, ::flip].copy()
+            labels = {
+                entity: label[:, ::flip].copy()
+                for entity, label in labels.items()
+            }
 
-        return image, label, edge
+        return image, labels, edge
 
     def inference(self, config, model, image):
         size = image.size()

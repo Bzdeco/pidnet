@@ -1,12 +1,13 @@
 # ------------------------------------------------------------------------------
 # Written by Jiacong Xu (jiacong.xu@tamu.edu)
 # ------------------------------------------------------------------------------
+from typing import Dict
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import time
 from .model_utils import BasicBlock, Bottleneck, segmenthead, DAPPM, PAPPM, PagFM, Bag, Light_Bag
-import logging
 
 BatchNorm2d = nn.BatchNorm2d
 bn_mom = 0.1
@@ -14,7 +15,7 @@ algc = False
 
 
 class PIDNet(nn.Module):
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, downsample=True):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True):
         super(PIDNet, self).__init__()
         self.augment = augment
         
@@ -82,18 +83,11 @@ class PIDNet(nn.Module):
             
         self.layer5_d = self._make_layer(Bottleneck, planes * 2, planes * 2, 1)
         
-        # Prediction Head
+        # Prediction head, downsampling to common resolution with the scale factor
         if self.augment:
-            self.seghead_p = segmenthead(planes * 2, head_planes, num_classes)
-            self.seghead_d = segmenthead(planes * 2, planes, 1)           
-
-        self.final_layer = segmenthead(planes * 4, head_planes, num_classes)
-
-        # Downsampling to common resolution
-        self.downsample = downsample
-        self.downsample_p = nn.Conv2d(num_classes, num_classes, kernel_size=2, stride=2)
-        self.downsample_d = nn.Conv2d(1, 1, kernel_size=2, stride=2)
-        self.downsample_main = nn.Conv2d(num_classes, num_classes, kernel_size=2, stride=2)
+            self.seghead_p = segmenthead(planes * 2, head_planes, num_classes, scale_factor=0.5)
+            self.seghead_d = segmenthead(planes * 2, planes, 1, scale_factor=0.5)
+        self.final_layer = segmenthead(planes * 4, head_planes, num_classes, scale_factor=0.5)
 
         # Layers initialization
         for m in self.modules():
@@ -136,7 +130,7 @@ class PIDNet(nn.Module):
         
         return layer
 
-    def forward(self, x):
+    def forward(self, x) -> Dict[str, torch.Tensor]:
         width_output = x.shape[-1] // 8
         height_output = x.shape[-2] // 8
 
@@ -179,20 +173,13 @@ class PIDNet(nn.Module):
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
             x_extra_d = self.seghead_d(temp_d)
-
-            if self.downsample:
-                return [
-                    self.downsample_p(x_extra_p),
-                    self.downsample_main(x_),
-                    self.downsample_d(x_extra_d)
-                ]
-            else:
-                return [x_extra_p, x_, x_extra_d]
+            return {
+                "p": x_extra_p,
+                "main": x_,
+                "d": x_extra_d
+            }
         else:
-            if self.downsample:
-                return self.downsample_main(x_)
-            else:
-                return x_
+            return {"main": x_}
 
 
 def get_seg_model(cfg):

@@ -4,16 +4,15 @@
 import argparse
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
-import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torch.optim
 from hydra import initialize, compose
 from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig
-from torch import nn
+from torch import nn, ModuleDict
 from torch.cuda import amp
 from torch.cuda.amp import GradScaler
 from torch.optim import Optimizer
@@ -50,7 +49,7 @@ def run_training(
     config_powerlines: DictConfig,
     resume_run_id: Optional[int] = None,
     resume_epoch: Optional[int] = None
-) -> Optional[float]:
+) -> Optional[List[float]]:
     update_config(config, default_commandline_arguments())
 
     import random
@@ -78,8 +77,8 @@ def run_training(
         pin_memory=False,
         persistent_workers=True,
         drop_last=True,
-        # worker_init_fn=seed.seed_worker,
-        # generator=seed.torch_generator()
+        worker_init_fn=seed.seed_worker,
+        generator=seed.torch_generator()
     )
 
     val_dataloader = DataLoader(
@@ -90,8 +89,8 @@ def run_training(
         pin_memory=False,
         persistent_workers=True,
         drop_last=False,
-        # worker_init_fn=seed.seed_worker,
-        # generator=seed.torch_generator()
+        worker_init_fn=seed.seed_worker,
+        generator=seed.torch_generator()
     )
 
     # criterion
@@ -99,21 +98,34 @@ def run_training(
     if ohem_config.enabled:
         print("Using OHEM in loss function")
         min_kept = int(ohem_config.keep_fraction * (config_powerlines.data.patch_size ** 2))
-        semantic_seg_criterion = OhemCrossEntropy(
-            ignore_label=config.TRAIN.IGNORE_LABEL,
-            thres=ohem_config.threshold,
-            min_kept=min_kept,
-            weight=train_dataset.class_weights
-        )
+        semantic_seg_criterion = ModuleDict({
+            "cables": OhemCrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                thres=ohem_config.threshold,
+                min_kept=min_kept,
+                weight=train_dataset.cables_class_weights
+            ),
+            "poles": OhemCrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                thres=ohem_config.threshold,
+                min_kept=min_kept,
+                weight=train_dataset.poles_class_weights
+            )
+        })
     else:
-        semantic_seg_criterion = CrossEntropy(
-            ignore_label=config.TRAIN.IGNORE_LABEL,
-            weight=train_dataset.class_weights
-        )
-    bd_criterion = BoundaryLoss()
+        semantic_seg_criterion = ModuleDict({
+            "cables": CrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                weight=train_dataset.cables_class_weights
+            ),
+            "poles": CrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                weight=train_dataset.poles_class_weights
+            )
+        })
 
     pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
-    model = FullModel(pidnet, semantic_seg_criterion, bd_criterion).cuda()
+    model = FullModel(pidnet, semantic_seg_criterion, poles_weight=config_powerlines.loss.poles_weight).cuda()
     optimizer = factory.optimizer(config_powerlines, model)
     scaler = amp.GradScaler(enabled=True)
 
@@ -127,18 +139,23 @@ def run_training(
     num_iters = n_epochs * epoch_iters
     validation_config = config_powerlines.validation
 
-    best_metric_value = -np.inf
+    best_metric_values = None
     for epoch in range(first_epoch, n_epochs):
         train(run, config_powerlines, epoch, epoch_iters, num_iters, train_dataloader, optimizer, scaler, model)
         if validation_config.every:
-            metric_value = validate(epoch, config, config_powerlines, run, val_dataloader, model)
-            best_metric_value = max(best_metric_value, metric_value)
+            optimized_metrics = validate(epoch, config, config_powerlines, run, val_dataloader, model)
+            if best_metric_values is None:
+                best_metric_values = optimized_metrics
+            else:
+                best_metric_values = [
+                    max(best_before, new_value) for best_before, new_value in zip(best_metric_values, optimized_metrics)
+                ]
         save_checkpoint(epoch, output_folder, model, optimizer, scaler)
 
     if validation_config.last:
         return validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
     else:
-        return best_metric_value
+        return best_metric_values
 
 
 def save_checkpoint(

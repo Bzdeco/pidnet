@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Dict
 
 import torch
 import torchvision.transforms.functional
@@ -47,13 +47,24 @@ def undo_image_preprocessing(image: torch.Tensor) -> torch.Tensor:
     return (255 * (image * imagenet_std + imagenet_mean)).int()
 
 
-def visualize_cables_detection(
-    image: torch.Tensor, prediction: torch.Tensor, target: torch.Tensor, downsampling_factor: int
-) -> Image:
-    image_vis = undo_image_preprocessing(image.detach().cpu()).permute((1, 2, 0)).int()
+def _pred_target_vis(prediction: torch.Tensor, target: torch.Tensor, downsampling_factor: int) -> torch.Tensor:
     pred_vis = pad_to(upsample(segmentation_as_image(prediction.detach().cpu().float()), downsampling_factor), (3000, 4096))
     target_vis = pad_to(upsample(segmentation_as_image(target.detach().cpu().float()), downsampling_factor), (3000, 4096))
-    stacked_vis = torch.concatenate((image_vis, pred_vis, target_vis), dim=1)
+    return torch.concatenate((pred_vis, target_vis), dim=1)
+
+
+def visualize_joint_detection(
+    image: torch.Tensor,
+    pred_cables: torch.Tensor,
+    pred_poles: torch.Tensor,
+    target_cables: torch.Tensor,
+    target_poles: torch.Tensor,
+    downsampling_factor: int
+) -> Image:
+    image_vis = undo_image_preprocessing(image.detach().cpu()).permute((1, 2, 0)).int()
+    cables_vis = _pred_target_vis(pred_cables, target_cables, downsampling_factor)
+    poles_vis = _pred_target_vis(pred_poles, target_poles, downsampling_factor)
+    stacked_vis = torch.concatenate((image_vis, cables_vis, poles_vis))
 
     width, height = 1024 * 3, 750
     pil_image = torchvision.transforms.functional.to_pil_image(stacked_vis.permute((2, 0, 1)) / 255, mode="RGB")
@@ -75,18 +86,22 @@ class VisualizationLogger:
         self,
         epoch: int,
         images: torch.Tensor,
-        predictions: torch.Tensor,
-        targets: torch.Tensor
+        predictions: Dict[str, torch.Tensor],
+        targets: Dict[str, torch.Tensor]
     ):
         if epoch != self._current_epoch:
             self._current_epoch = epoch
             self._n_logged = 0
 
         if epoch % self._every == 0 and self._n_logged < self._n_images_per_epoch:
-            for image, prediction, target in zip(images, predictions, targets):
+            for image, pred_cables, pred_poles, target_cables, target_poles in zip(
+                images, predictions["cables"], predictions["poles"], targets["cables"], targets["poles"]
+            ):
                 if self._n_logged < self._n_images_per_epoch:
                     self._run["images"].append(
-                        visualize_cables_detection(image, prediction, target, self._downsampling_factor),
+                        visualize_joint_detection(
+                            image, pred_cables, pred_poles, target_cables, target_poles, self._downsampling_factor
+                        ),
                         description=str(epoch)
                     )
                     self._n_logged += 1

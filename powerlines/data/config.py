@@ -19,12 +19,14 @@ class DataSourceConfig:
 
     inputs_folder: Path = field(init=False)
     distance_masks_folder: Path = field(init=False)
+    poles_distance_masks_folder: Path = field(init=False)
     exclusion_zones_distance_masks_folder: Path = field(init=False)
     labels_folder: Path = field(init=False)
 
     def __post_init__(self):
         self.inputs_folder = self.complete_frames_root_folder / "images"
         self.distance_masks_folder = self.complete_frames_root_folder / "distance_masks" / "visible"
+        self.poles_distance_masks_folder = self.complete_frames_root_folder / "poles_distance_masks"
         self.exclusion_zones_distance_masks_folder = self.complete_frames_root_folder / "exclusion_zones_distance_masks"
         self.labels_folder = self.complete_frames_root_folder / "labels"
 
@@ -65,6 +67,7 @@ class DataSourceConfig:
 @dataclass
 class LoadingConfig:
     distance_mask: bool
+    poles_distance_mask: bool
     exclusion_area_mask: bool
     labels: bool
 

@@ -11,27 +11,26 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 import neptune
 import numpy as np
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from neptune import Run
 from omegaconf import DictConfig
-
-from configs import config
+from torch import ModuleDict
 
 
 class FullModel(nn.Module):
-    def __init__(self, model, semantic_seg_loss, boundary_loss, use_boundary_aware_ce: bool = False):
+    def __init__(self, model: nn.Module, semantic_seg_losses: ModuleDict, poles_weight: float = 1.0):
         super(FullModel, self).__init__()
         self.model = model
-        self.sem_seg_loss = semantic_seg_loss
-        self.bd_loss = boundary_loss
-        self._use_boundary_aware_ce = use_boundary_aware_ce
+        self.sem_seg_losses = semantic_seg_losses
+
+        self.entity_to_channel = {"cables": 0, "poles": 1}
+        self.weights = {"cables": 1.0, "poles": poles_weight}
 
     def pixel_acc(self, pred, label):
         _, preds = torch.max(pred, dim=1)
@@ -41,24 +40,29 @@ class FullModel(nn.Module):
         acc = acc_sum.float() / (pixel_sum.float() + 1e-10)
         return acc
 
-    def forward(self, inputs: torch.Tensor, labels: torch.Tensor, bd_gt: Optional[torch.Tensor], *args, **kwargs):
+    def forward(self, inputs: torch.Tensor, labels: Dict[str, torch.Tensor], *args, **kwargs):
         outputs = self.model(inputs, *args, **kwargs)
 
-        acc = self.pixel_acc(outputs[-2], labels)
-        loss_s = self.sem_seg_loss(outputs[:-1], labels)
-        loss_b = self.bd_loss(outputs[-1], bd_gt) if bd_gt is not None else torch.tensor(0.0)
+        loss = None
+        accuracies = {}
+        predictions = {}
+        for entity, sem_seg_loss in self.sem_seg_losses.items():
+            channel = self.entity_to_channel[entity]
+            weight = self.weights[entity]
+            dense_pred_segmentation = outputs["p"][..., channel, :, :]
+            coarse_pred_segmentation = outputs["main"][..., channel, :, :]
 
-        # Boundary-aware CE loss
-        if self._use_boundary_aware_ce:
-            filler = torch.ones_like(labels) * config.TRAIN.IGNORE_LABEL
-            bd_label = torch.where(F.sigmoid(outputs[-1][:, 0, :, :]) > 0.8, labels, filler)
-            loss_sb = self.sem_seg_loss(outputs[-2], bd_label)
-        else:
-            loss_sb = torch.tensor(0.0)
+            accuracies[entity] = self.pixel_acc(dense_pred_segmentation, labels[entity])
+            seg_loss = weight * sem_seg_loss([dense_pred_segmentation, coarse_pred_segmentation], labels[entity])
 
-        loss = loss_s + loss_b + loss_sb
+            if loss is None:
+                loss = seg_loss
+            else:
+                loss += seg_loss
 
-        return torch.unsqueeze(loss, 0), outputs[:-1], acc, [loss_s, loss_b]
+            predictions[entity] = {"p": dense_pred_segmentation, "main": coarse_pred_segmentation}
+
+        return torch.unsqueeze(loss, 0), predictions, accuracies
 
 
 class AverageMeter(object):
