@@ -28,7 +28,6 @@ PATCH_SIZE = 1024
 
 
 def perturbation_from_hyperparameters(hyperparameters: Union[Configuration, Dict[str, Any]]) -> int:
-    patch_size = hyperparameters["patch_size"]
     return int(hyperparameters["perturbation_fraction"] * PATCH_SIZE)
 
 
