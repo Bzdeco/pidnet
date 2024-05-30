@@ -127,7 +127,7 @@ def f1(precision: Union[float, np.ndarray], recall: Union[float, np.ndarray]) ->
 @dataclass
 class SegmentationMetrics:
     def __init__(
-        self, bin_thresholds: List[float], tolerance_region: float
+        self, bin_thresholds: List[float], tolerance_region: float, minimal_logging: bool = False
     ):
         self._y_true = torch.empty((0,))
         self._y_pred_prob = torch.empty((0,))
@@ -138,6 +138,8 @@ class SegmentationMetrics:
         self._ccq_tp = np.asarray([0] * num_bin_thresholds)
         self._ccq_fp = np.asarray([0] * num_bin_thresholds)
         self._ccq_fn = np.asarray([0] * num_bin_thresholds)
+
+        self._minimal_logging = minimal_logging
 
     def __call__(self, prediction: torch.Tensor, target_labels: torch.Tensor):
         # Precision, recall, F1
@@ -165,40 +167,46 @@ class SegmentationMetrics:
         quality_values = quality(self._ccq_tp, self._ccq_fp, self._ccq_fn)
         best_quality_idx = np.argmax(quality_values)
         best_bin_threshold = self._bin_thresholds[best_quality_idx]
-        correctness_values = correctness(self._ccq_tp, self._ccq_fp)
-        completeness_values = completeness(self._ccq_tp, self._ccq_fn)
-
-        y_pred_prob = self._y_pred_prob.detach().cpu().numpy()
-        y_pred = y_pred_prob >= best_bin_threshold
-        y_true = self._y_true.detach().cpu().numpy()
-
-        precision = precision_score(y_true, y_pred)
-        recall = recall_score(y_true, y_pred)
-        ap = average_precision_score(y_true, y_pred_prob)
 
         # Results for best scoring threshold wrt reference quality metric
         results = {
-            "precision": precision,
-            "recall": recall,
-            "f1": f1(precision, recall),
-            "average_precision": ap,
-            "correctness": correctness_values[best_quality_idx],
-            "completeness": completeness_values[best_quality_idx],
             "quality": quality_values[best_quality_idx],
             "scoring_threshold": best_bin_threshold
         }
 
         # Results for other scoring thresholds
-        for i, bin_thresh in enumerate(self._bin_thresholds):
-            y_pred = y_pred_prob >= bin_thresh
+        if not self._minimal_logging:
+            correctness_values = correctness(self._ccq_tp, self._ccq_fp)
+            completeness_values = completeness(self._ccq_tp, self._ccq_fn)
+
+            y_pred_prob = self._y_pred_prob.detach().cpu().numpy()
+            y_pred = y_pred_prob >= best_bin_threshold
+            y_true = self._y_true.detach().cpu().numpy()
+
             precision = precision_score(y_true, y_pred)
             recall = recall_score(y_true, y_pred)
+            ap = average_precision_score(y_true, y_pred_prob)
 
-            results[f"precision_{bin_thresh:.2f}"] = precision
-            results[f"recall_{bin_thresh:.2f}"] = recall
-            results[f"f1_{bin_thresh:.2f}"] = f1(precision, recall)
-            results[f"correctness_{bin_thresh:.2f}"] = correctness_values[i]
-            results[f"completeness_{bin_thresh:.2f}"] = completeness_values[i]
-            results[f"quality_{bin_thresh:.2f}"] = quality_values[i]
+            results = {
+                **results,
+                "precision": precision,
+                "recall": recall,
+                "f1": f1(precision, recall),
+                "average_precision": ap,
+                "correctness": correctness_values[best_quality_idx],
+                "completeness": completeness_values[best_quality_idx]
+            }
+
+            for i, bin_thresh in enumerate(self._bin_thresholds):
+                y_pred = y_pred_prob >= bin_thresh
+                precision = precision_score(y_true, y_pred)
+                recall = recall_score(y_true, y_pred)
+
+                results[f"precision_{bin_thresh:.2f}"] = precision
+                results[f"recall_{bin_thresh:.2f}"] = recall
+                results[f"f1_{bin_thresh:.2f}"] = f1(precision, recall)
+                results[f"correctness_{bin_thresh:.2f}"] = correctness_values[i]
+                results[f"completeness_{bin_thresh:.2f}"] = completeness_values[i]
+                results[f"quality_{bin_thresh:.2f}"] = quality_values[i]
 
         return results

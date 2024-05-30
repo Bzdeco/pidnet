@@ -6,6 +6,7 @@ optimized_metrics:
   - cables/quality
   - poles/quality
 verbose: false
+minimal_logging: true
 
 data:
   augmentations:

@@ -19,20 +19,17 @@ from hydra import initialize, compose
 from smac import Scenario, MultiFidelityFacade
 from smac.intensifier import Hyperband
 
-# Absolutely maximal amounts of batch sizes to not exceed GPU memory for 5 concurrent runs
-CONFIG_FOR_PATCH_SIZE = {
-    512: {"batch_size": 64},
-    1024: {"batch_size": 16}
-}
-
 
 def _values_range(base: float, spread: float) -> List[float]:
     return [base - spread, base + spread]
 
 
+PATCH_SIZE = 1024
+
+
 def perturbation_from_hyperparameters(hyperparameters: Union[Configuration, Dict[str, Any]]) -> int:
     patch_size = hyperparameters["patch_size"]
-    return int(hyperparameters["perturbation_fraction"] * patch_size)
+    return int(hyperparameters["perturbation_fraction"] * PATCH_SIZE)
 
 
 def overrides_from_trial_config(hpo_run_id: int, trial_id: int) -> List[str]:
@@ -41,7 +38,6 @@ def overrides_from_trial_config(hpo_run_id: int, trial_id: int) -> List[str]:
     return [
         f"data.augmentations.color_jitter.magnitude={hyperparameters['color_jitter_magnitude']}",
         f"data.augmentations.multi_scale.enabled={hyperparameters['multi_scale_enabled']}",
-        f"data.patch_size={hyperparameters['patch_size']}",
         f"data.perturbation={perturbation_from_hyperparameters(hyperparameters)}",
         f"data.negative_sample_prob={hyperparameters['negative_sample_prob']}",
         f"data.batch_size.train={hyperparameters['batch_size']}",
@@ -57,7 +53,6 @@ def overrides_from_hpc(
     return [
         f"data.augmentations.color_jitter.magnitude={config['color_jitter_magnitude']}",
         f"data.augmentations.multi_scale.enabled={config['multi_scale_enabled']}",
-        f"data.patch_size={config['patch_size']}",
         f"data.perturbation={perturbation_from_hyperparameters(config)}",
         f"data.negative_sample_prob={config['negative_sample_prob']}",
         f"data.batch_size.train={config['batch_size']}",
@@ -66,13 +61,6 @@ def overrides_from_hpc(
         f"optimizer.wd={config['wd']}",
         f"epochs={epochs}"
     ]
-
-
-def _check_is_forbidden_configuration(config: DictConfig) -> bool:
-    patch_size = config.data.patch_size
-    batch_size = config.data.batch_size.train
-    max_batch_size = CONFIG_FOR_PATCH_SIZE[patch_size]["batch_size"]
-    return batch_size > max_batch_size
 
 
 class HPORunner:
@@ -118,15 +106,15 @@ class HPORunner:
         torch.cuda.empty_cache()
         hydra_config = self.hydra_config_from_hpc(config, epochs=int(budget))
 
-        optimized_metric = run_training(hydra_config)
+        optimized_metrics = run_training(hydra_config)
 
         if self._goal == "maximize":
             return {
                 name: 1 - value  # SMAC minimizes the target function
-                for name, value in optimized_metric.items()
+                for name, value in optimized_metrics.items()
             }
         else:
-            return optimized_metric
+            return optimized_metrics
 
 
 def run_hyper_parameter_search(

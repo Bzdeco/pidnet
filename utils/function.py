@@ -90,8 +90,8 @@ def validate(
 
     loss_meter = {"cables": AverageMeter(), "poles": AverageMeter(), "total": AverageMeter()}
     seg_metrics = {
-        "cables": segmentation_metrics(),
-        "poles": segmentation_metrics()
+        "cables": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging),
+        "poles": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging)
     }
     vis_logger = VisualizationLogger(run, config_powerlines)
 
