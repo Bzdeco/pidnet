@@ -236,7 +236,7 @@ def mask_exclusion_zones_in_distance_mask(
     exclusion_zone_filepath: Path,
     downsample_factor: int
 ) -> torch.Tensor:
-    exclusion_zone_dist_mask = load_npy(exclusion_zone_filepath)
+    exclusion_zone_dist_mask = load_npy(exclusion_zone_filepath)[0]
     downsampled_exclusion_zone_dist_mask = downsample(exclusion_zone_dist_mask, downsample_factor)
 
     pred_h, pred_w = distance_mask.shape[-2:]
