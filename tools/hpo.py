@@ -57,7 +57,7 @@ def overrides_from_hpc(
         f"data.negative_sample_prob={config['negative_sample_prob']}",
         f"data.batch_size.train={config['batch_size']}",
         f"loss.ohem.enabled={config['ohem_enabled']}",
-        f"loss.poles_weight={config['poles_weight']}"
+        f"loss.poles_weight={config['poles_weight']}",
         f"optimizer.lr={config['lr']}",
         f"optimizer.wd={config['wd']}",
         f"epochs={epochs}"
