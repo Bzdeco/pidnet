@@ -44,7 +44,8 @@ class InferenceCablesDetectionDataset(BaseDataset):
     def __getitem__(self, frame_id: int):
         annotation = self.annotations[self.timestamps[frame_id]]
         frame = load_complete_frame(annotation, self.data_source, self.sampling, self.loading)
-        name = str(frame["timestamp"])
+        timestamp = frame["timestamp"]
+        name = str(timestamp)
         size = frame["image"].shape
 
         image = frame["image"]
@@ -60,7 +61,8 @@ class InferenceCablesDetectionDataset(BaseDataset):
             "labels_cables": labels["cables"],
             "labels_poles": labels["poles"],
             "size": np.array(size),
-            "name": name
+            "name": name,
+            "timestamp": timestamp
         }
         if edge is not None:
             sample["edge"] = edge

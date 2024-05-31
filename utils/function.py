@@ -90,8 +90,8 @@ def validate(
 
     loss_meter = {"cables": AverageMeter(), "poles": AverageMeter(), "total": AverageMeter()}
     seg_metrics = {
-        "cables": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging),
-        "poles": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging)
+        "cables": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging, mask_exclusion_zones=False),
+        "poles": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging, mask_exclusion_zones=True)
     }
     vis_logger = VisualizationLogger(run, config_powerlines)
 
@@ -99,6 +99,7 @@ def validate(
         iterator = tqdm(dataloader, desc="Validating") if config_powerlines.verbose else dataloader
         for idx, batch in enumerate(iterator):
             images = batch["image"].cuda()
+            timestamps = batch["timestamp"]
             labels = {
                 "cables": downsample_labels(
                     batch["labels_cables"].cuda().float(), grid_size=16, adjust_to_divisible=False
@@ -115,9 +116,9 @@ def validate(
             # Update segmentation metrics
             vis_predictions = {}
             for entity, seg_metric in seg_metrics.items():
-                seg_prediction = predictions[entity]["main"]
-                vis_predictions[entity] = seg_prediction
-                seg_metric(seg_prediction, labels[entity])
+                seg_predictions = predictions[entity]["main"]
+                vis_predictions[entity] = seg_predictions
+                seg_metric(seg_predictions, labels[entity], timestamps)
 
             # Update losses
             for entity, loss_value in losses.items():

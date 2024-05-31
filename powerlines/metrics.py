@@ -12,6 +12,7 @@ from scipy.ndimage import distance_transform_edt
 from sklearn.metrics import precision_score, recall_score, average_precision_score
 
 from powerlines.data.utils import pad_array_to_match_target_size, MAX_DISTANCE_MASK_VALUE
+from powerlines.utils import load_npy
 
 CCQConfusionMatrix = namedtuple("CCQConfusionMatrix", ["tp", "fp", "fn"])
 
@@ -127,7 +128,11 @@ def f1(precision: Union[float, np.ndarray], recall: Union[float, np.ndarray]) ->
 @dataclass
 class SegmentationMetrics:
     def __init__(
-        self, bin_thresholds: List[float], tolerance_region: float, minimal_logging: bool = False
+        self,
+        bin_thresholds: List[float],
+        tolerance_region: float,
+        minimal_logging: bool = False,
+        mask_exclusion_zones: bool = False
     ):
         self._y_true = torch.empty((0,))
         self._y_pred_prob = torch.empty((0,))
@@ -141,7 +146,13 @@ class SegmentationMetrics:
 
         self._minimal_logging = minimal_logging
 
-    def __call__(self, prediction: torch.Tensor, target_labels: torch.Tensor):
+        self._mask_exclusion_zones = mask_exclusion_zones
+        self._exclusion_zones_folder = Path(
+            "/scratch/cvlab/home/gwizdala/dataset/processed/daedalean/complete_frames/exclusion_zones_distance_masks"
+        )
+        self._downsample_factor = 16
+
+    def __call__(self, prediction: torch.Tensor, target_labels: torch.Tensor, timestamps: torch.Tensor):
         # Precision, recall, F1
         pred_probabilities = torch.softmax(prediction, dim=1)[:, 1].detach().cpu()
         flat_pred_probabilities = pred_probabilities.flatten()
@@ -150,8 +161,16 @@ class SegmentationMetrics:
         self._y_true = torch.cat((self._y_true, gt_labels_flat))
 
         # CCQ metrics
-        for prediction, target in zip(pred_probabilities, target_labels):
+        for timestamp, prediction, target in zip(timestamps, pred_probabilities, target_labels):
             gt_distance = distance_transform((target == 1).detach().cpu().numpy())
+
+            if self._mask_exclusion_zones:
+                gt_distance = mask_exclusion_zones_in_distance_mask(
+                    torch.from_numpy(gt_distance),
+                    self._exclusion_zones_folder / f"{timestamp.item()}.npy",
+                    self._downsample_factor
+                ).numpy()
+
             conf_matrix = relaxed_confusion_matrix(
                 prediction.float().numpy(),
                 gt_distance,
@@ -210,3 +229,18 @@ class SegmentationMetrics:
                 results[f"quality_{bin_thresh:.2f}"] = quality_values[i]
 
         return results
+
+
+def mask_exclusion_zones_in_distance_mask(
+    distance_mask: torch.Tensor,
+    exclusion_zone_filepath: Path,
+    downsample_factor: int
+) -> torch.Tensor:
+    exclusion_zone_dist_mask = load_npy(exclusion_zone_filepath)
+    downsampled_exclusion_zone_dist_mask = downsample(exclusion_zone_dist_mask, downsample_factor)
+
+    pred_h, pred_w = distance_mask.shape[-2:]
+    masked_area = (downsampled_exclusion_zone_dist_mask == 0)[..., :pred_h, :pred_w]  # area strictly in exclusion zone
+
+    distance_mask[masked_area] = INVALID_MASK_VALUE
+    return distance_mask

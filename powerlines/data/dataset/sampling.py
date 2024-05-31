@@ -88,7 +88,8 @@ class TrainCablesDetectionDataset(BaseDataset):
         frame = load_complete_frame(annotation, self.data_source, self.sampling, self.loading)
 
         size = frame["image"].shape
-        name = str(frame["timestamp"])
+        timestamp = frame["timestamp"]
+        name = str(timestamp)
 
         if self._should_sample_positive_sample(frame):
             patch_centers_data = frame["positive_sampling_centers_data"]
@@ -111,7 +112,8 @@ class TrainCablesDetectionDataset(BaseDataset):
             "labels_cables": labels["cables"],
             "labels_poles": labels["poles"],
             "size": np.array(size),
-            "name": name
+            "name": name,
+            "timestamp": timestamp
         }
         if edge is not None:
             sample["edge"] = edge
