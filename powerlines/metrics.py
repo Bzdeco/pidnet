@@ -89,17 +89,20 @@ def relaxed_confusion_matrix(
 
 def visualize_distance_masks(pred_distance_mask: np.ndarray, target_distance_mask: np.ndarray, masked: bool):
     cmap = plt.get_cmap("gray").with_extremes(under="red", over="blue")
-    combined = np.concatenate((pred_distance_mask, target_distance_mask), axis=1)
+    combined = np.concatenate((pred_distance_mask, target_distance_mask), axis=1).astype(float)
 
     folder = Path("/scratch/cvlab/home/gwizdala/output/distance_masks_temp")
     folder.mkdir(exist_ok=True)
     suffix = "_masked" if masked else ""
     filename = f"distance_mask_{len(list(folder.glob('*.png')))}{suffix}.png"
 
-    print(np.count_nonzero(combined == INVALID_MASK_VALUE))
-    combined[combined < 158] = 1 - np.clip(combined[combined < 158], a_min=0, a_max=128) / 128
-    combined[combined >= 158] = 2
-    plt.imshow(combined, cmap=cmap, vmin=0, vmax=1)
+    # combined[combined != INVALID_MASK_VALUE] = 1 - np.clip(combined[combined != INVALID_MASK_VALUE], a_min=0, a_max=128) / 128
+    # combined = 1 - np.clip(combined, a_min=0, a_max=128) / 128
+    # combined[combined == INVALID_MASK_VALUE] = 2
+    print("under", np.count_nonzero(combined < 0))
+    print("over", np.count_nonzero(combined > 1000))
+    print("invalid", np.count_nonzero(combined == INVALID_MASK_VALUE))
+    plt.imshow(combined, cmap=cmap, vmin=0, vmax=1000)
     plt.savefig(folder / filename)
     plt.close()
 
