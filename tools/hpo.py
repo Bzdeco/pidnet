@@ -41,6 +41,7 @@ def overrides_from_trial_config(hpo_run_id: int, trial_id: int) -> List[str]:
         f"data.negative_sample_prob={hyperparameters['negative_sample_prob']}",
         f"data.batch_size.train={hyperparameters['batch_size']}",
         f"loss.ohem.enabled={hyperparameters['ohem_enabled']}",
+        f"loss.poles_weight={hyperparameters['poles_weight']}",
         f"optimizer.lr={hyperparameters['lr']}",
         f"optimizer.wd={hyperparameters['wd']}"
     ]
@@ -56,6 +57,7 @@ def overrides_from_hpc(
         f"data.negative_sample_prob={config['negative_sample_prob']}",
         f"data.batch_size.train={config['batch_size']}",
         f"loss.ohem.enabled={config['ohem_enabled']}",
+        f"loss.poles_weight={config['poles_weight']}"
         f"optimizer.lr={config['lr']}",
         f"optimizer.wd={config['wd']}",
         f"epochs={epochs}"
@@ -83,6 +85,7 @@ class HPORunner:
             Categorical("ohem_enabled", [False, True], default=True),
             Float("lr", (1e-5, 1e-2), default=1e-2, log=True),
             Float("wd", (1e-6, 1e-1), default=5e-4, log=True),
+            Float("poles_weight", (0.25, 4.0), default=1.0)
         ])
 
         return config_space
