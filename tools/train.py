@@ -159,6 +159,85 @@ def run_training(
         return best_metric_values
 
 
+def run_validation(
+    config_powerlines: DictConfig,
+    resume_run_id: Optional[int] = None
+):
+    update_config(config, default_commandline_arguments())
+
+    import random
+    print("Seeding with", SEED)
+    random.seed(SEED)
+    torch.manual_seed(SEED)
+
+    resume = (resume_run_id is not None)
+    run = create_neptune_run(config_powerlines.name, resume=resume, from_run_id=resume_run_id)
+    output_folder = checkpoint_folder(config_powerlines, run_id(run))
+    run["config"] = stringify_unsupported(config_powerlines)
+    run["config/pidnet"] = stringify_unsupported(dict(config))
+
+    # cudnn related setting
+    cudnn.benchmark = config.CUDNN.BENCHMARK
+    cudnn.deterministic = config.CUDNN.DETERMINISTIC
+    cudnn.enabled = config.CUDNN.ENABLED
+
+    train_dataset = factory.train_dataset(config_powerlines)
+
+    val_dataloader = DataLoader(
+        factory.val_dataset(config_powerlines),
+        batch_size=config_powerlines.data.batch_size.val,
+        shuffle=False,
+        num_workers=config_powerlines.data.num_workers.val,
+        pin_memory=False,
+        persistent_workers=True,
+        drop_last=False,
+        worker_init_fn=seed.seed_worker,
+        generator=seed.torch_generator()
+    )
+
+    # criterion
+    ohem_config = config_powerlines.loss.ohem
+    if ohem_config.enabled:
+        print("Using OHEM in loss function")
+        min_kept = int(ohem_config.keep_fraction * (config_powerlines.data.patch_size ** 2))
+        semantic_seg_criterion = {
+            "cables": OhemCrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                thres=ohem_config.threshold,
+                min_kept=min_kept,
+                weight=train_dataset.cables_class_weights
+            ),
+            "poles": OhemCrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                thres=ohem_config.threshold,
+                min_kept=min_kept,
+                weight=train_dataset.poles_class_weights
+            )
+        }
+    else:
+        semantic_seg_criterion = {
+            "cables": CrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                weight=train_dataset.cables_class_weights
+            ),
+            "poles": CrossEntropy(
+                ignore_label=config.TRAIN.IGNORE_LABEL,
+                weight=train_dataset.poles_class_weights
+            )
+        }
+
+    pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
+    model = FullModel(pidnet, semantic_seg_criterion, poles_weight=config_powerlines.loss.poles_weight).cuda()
+    optimizer = factory.optimizer(config_powerlines, model)
+    scaler = amp.GradScaler(enabled=True)
+
+    checkpoints = sorted(list(output_folder.glob("*.pt")))
+    for checkpoint in checkpoints:
+        epoch = int(checkpoint.stem)
+        model, optimizer, scaler = load_checkpoint(epoch, output_folder, model, optimizer, scaler)
+        validate(epoch, config, config_powerlines, run, val_dataloader, model)
+
+
 def save_checkpoint(
     epoch: int, folder: Path, model: nn.Module, optimizer: Optimizer, scaler: GradScaler, filename: Optional[str] = None
 ):
@@ -188,6 +267,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--fold", required=False, type=int)
     parser.add_argument("--resume", required=False, type=int)
+    parser.add_argument("--validate", required=False, type=int)
     parser.add_argument("--epoch", required=False, type=int)
     args = parser.parse_args()
 
@@ -199,4 +279,8 @@ if __name__ == '__main__':
         powerlines_cfg.name = f"{powerlines_cfg.name}-fold-{fold}"
         powerlines_cfg.data.cv.fold = fold
 
-    run_training(powerlines_cfg, args.resume, args.epoch)
+    if args.validate is not None:
+        assert args.fold is not None, "Must provide fold of the validated run"
+        run_validation(powerlines_cfg, args.validate)
+    else:
+        run_training(powerlines_cfg, args.resume, args.epoch)
