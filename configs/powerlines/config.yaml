@@ -26,10 +26,10 @@ data:
   non_sky_bias: 0.5
   num_workers:
     train: 12
-    val: 6
+    val: 12
   batch_size:
     train: 39
-    val: 6
+    val: 12
   cv:
     num_folds: 5
     fold: null
