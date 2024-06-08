@@ -22,7 +22,7 @@ data:
   downsampling_factor: 16
   patch_size: 1024
   perturbation: 388
-  negative_sample_prob: 0.13049906840749562
+  negative_sample_prob: 0.13773327245748596
   non_sky_bias: 0.5
   num_workers:
     train: 14
@@ -40,7 +40,7 @@ data:
     val: null
 
 loss:
-  poles_weight: 1.0
+  poles_weight: 1.222336583670382
   ohem:
     enabled: true
     threshold: 0.9

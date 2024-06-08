@@ -34,7 +34,7 @@ class PIDNet(nn.Module):
         self.layer2 = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
         self.layer3 = self._make_layer(BasicBlock, planes * 2, planes * 4, n, stride=2)
         self.layer4 = self._make_layer(BasicBlock, planes * 4, planes * 8, n, stride=2)
-        self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
+        self.layer5 = self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
         
         # P Branch
         self.compression3 = nn.Sequential(

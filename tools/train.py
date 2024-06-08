@@ -12,7 +12,7 @@ import torch.optim
 from hydra import initialize, compose
 from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig
-from torch import nn, ModuleDict
+from torch import nn
 from torch.cuda import amp
 from torch.cuda.amp import GradScaler
 from torch.optim import Optimizer
