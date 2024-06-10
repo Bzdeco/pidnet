@@ -44,7 +44,7 @@ def default_commandline_arguments() -> DictConfig:
     })
 
 
-def run_training(config_powerlines: DictConfig, goal: str) -> Optional[float]:  # returns optimized metric
+def run_training(config_powerlines: DictConfig, goal: str = "maximize") -> Optional[float]:  # returns optimized metric
     args = default_commandline_arguments()
     update_config(config, args)
 
@@ -124,6 +124,7 @@ def run_training(config_powerlines: DictConfig, goal: str) -> Optional[float]:  
     n_epochs = config_powerlines.epochs
     num_iters = n_epochs * epoch_iters
     validation_config = config_powerlines.validation
+    checkpointing_config = config_powerlines.checkpointing
 
     best_metric_value = -np.inf if goal == "maximize" else np.inf
     for epoch in range(last_epoch, n_epochs):
@@ -132,7 +133,8 @@ def run_training(config_powerlines: DictConfig, goal: str) -> Optional[float]:  
             metric_value = validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)
             best_metric_value = max(best_metric_value, metric_value) if goal == "maximize" \
                 else min(best_metric_value, metric_value)
-        save_checkpoint(epoch, output_folder, model, optimizer)
+        if checkpointing_config.enabled:
+            save_checkpoint(epoch, output_folder, model, optimizer)
 
     if validation_config.last:
         return validate(n_epochs - 1, config, config_powerlines, run, val_dataloader, model)

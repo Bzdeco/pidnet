@@ -56,6 +56,9 @@ validation:
   every: true
   last: false
 
+checkpointing:
+  enabled: false
+
 visualization:
-  n_images_per_epoch: 3
-  every: 1
+  n_images_per_epoch: 0
+  every: 100

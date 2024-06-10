@@ -1,9 +1,6 @@
 from utils import seed
 seed.set_global_seeds()
 
-# import torch.multiprocessing
-# torch.multiprocessing.set_start_method("spawn", force=True)
-
 from powerlines.hpo import HyperparameterOptimizationCallback, fetch_run
 from tools.train import run_training
 
@@ -18,12 +15,6 @@ from ConfigSpace import ConfigurationSpace, Configuration, Float, Integer, Categ
 from hydra import initialize, compose
 from smac import Scenario, MultiFidelityFacade
 from smac.intensifier import Hyperband
-
-# Absolutely maximal amounts of batch sizes to not exceed GPU memory for 5 concurrent runs
-CONFIG_FOR_PATCH_SIZE = {
-    512: {"batch_size": 64},
-    1024: {"batch_size": 16}
-}
 
 
 def _values_range(base: float, spread: float) -> List[float]:
@@ -66,13 +57,6 @@ def overrides_from_hpc(
         f"optimizer.wd={config['wd']}",
         f"epochs={epochs}"
     ]
-
-
-def _check_is_forbidden_configuration(config: DictConfig) -> bool:
-    patch_size = config.data.patch_size
-    batch_size = config.data.batch_size.train
-    max_batch_size = CONFIG_FOR_PATCH_SIZE[patch_size]["batch_size"]
-    return batch_size > max_batch_size
 
 
 class HPORunner:
@@ -122,13 +106,6 @@ class HPORunner:
         # Train model and get best achieved result
         torch.cuda.empty_cache()
         hydra_config = self.hydra_config_from_hpc(config, epochs=int(budget))
-
-        if _check_is_forbidden_configuration(hydra_config):
-            print(
-                f"Forbidden configuration: "
-                f"patch_size={hydra_config.data.patch_size} batch_size={hydra_config.data.batch_size.train}"
-            )
-            return 1  # worst possible result
 
         optimized_metric = run_training(hydra_config, self._goal)
 
