@@ -12,7 +12,7 @@ data:
   augmentations:
     color_jitter:
       enabled: true
-      magnitude: 0.03131800152990488
+      magnitude: 0.25880605005129625
     flip:
       enabled: true
     multi_scale:
@@ -21,15 +21,15 @@ data:
 
   downsampling_factor: 16
   patch_size: 1024
-  perturbation: 388
-  negative_sample_prob: 0.13773327245748596
+  perturbation: 473
+  negative_sample_prob: 0.10869016106810858
   non_sky_bias: 0.5
   num_workers:
-    train: 14
+    train: 12
     val: 6
   batch_size:
-    train: 3
-    val: 1
+    train: 8
+    val: 6
   cv:
     num_folds: 5
     fold: null
@@ -40,26 +40,29 @@ data:
     val: null
 
 loss:
-  poles_weight: 1.222336583670382
+  poles_weight: 1.0
   ohem:
-    enabled: true
+    enabled: false
     threshold: 0.9
     keep_fraction: 0.125
 
 optimizer:
   name: adam
-  lr: 0.000053174707862687346
-  wd: 0.000042226933671866335
+  lr: 0.00026546297924107056
+  wd: 0.00003328371707969199
   adjust_lr: false
 
 paths:
   complete_frames: /scratch/cvlab/home/gwizdala/dataset/processed/daedalean/complete_frames
-  annotations: /scratch/cvlab/home/gwizdala/dataset/daedalean/cable-annotations
+  annotations: /scratch/cvlab/home/gwizdala/dataset/daedalean/annotations
   checkpoints: /scratch/cvlab/home/gwizdala/output/checkpoints
 
 validation:
   every: true
   last: false
+
+checkpointing:
+  enabled: false
 
 visualization:
   n_images_per_epoch: 0
