@@ -8,23 +8,23 @@ data:
   augmentations:
     color_jitter:
       enabled: true
-      magnitude: 0.2
+      magnitude: 0.25880605005129625
     flip:
       enabled: true
     multi_scale:
-      enabled: true
+      enabled: false
       scale_factor: 15
 
   downsampling_factor: 16
   patch_size: 1024
-  perturbation: 384
-  negative_sample_prob: 0.12
+  perturbation: 473
+  negative_sample_prob: 0.10869016106810858
   non_sky_bias: 0.5
   num_workers:
     train: 12
     val: 6
   batch_size:
-    train: 12
+    train: 8
     val: 6
   cv:
     num_folds: 5
@@ -37,14 +37,14 @@ data:
 
 loss:
   ohem:
-    enabled: true
+    enabled: false
     threshold: 0.9
     keep_fraction: 0.125
 
 optimizer:
   name: adam
-  lr: 1e-4
-  wd: 1e-4
+  lr: 0.00026546297924107056
+  wd: 0.00003328371707969199
   adjust_lr: false
 
 paths:
