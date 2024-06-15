@@ -42,7 +42,7 @@ data:
 loss:
   poles_weight: 1.0
   ohem:
-    enabled: false
+    enabled: true
     threshold: 0.9
     keep_fraction: 0.125
 
