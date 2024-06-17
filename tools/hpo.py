@@ -86,8 +86,8 @@ class HPORunner:
             Float("perturbation_fraction", (0.0, 0.875), default=0.375),
             Float("negative_sample_prob", (0.0, 0.25), default=0.12),
             # Integer("batch_size", (2, 64), default=12, log=True),
-            Float("ohem_threshold", (0.0, 1.0), default=0.9, q=10),
-            Float("ohem_keep_fraction", (0.0, 1.0), default=0.125, q=8),
+            Float("ohem_threshold", (0.0, 1.0), default=0.9, q=0.1),
+            Float("ohem_keep_fraction", (0.0, 1.0), default=0.125, q=0.125),
             # Float("lr", (1e-5, 1e-2), default=1e-2, log=True),
             # Float("wd", (1e-6, 1e-1), default=5e-4, log=True),
             Float("poles_weight", (0.25, 4.0), default=1.0)
