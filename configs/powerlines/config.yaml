@@ -6,7 +6,7 @@ optimized_metrics:
   - cables/quality
   - poles/quality
 verbose: false
-minimal_logging: false
+minimal_logging: true
 
 data:
   augmentations:
@@ -25,7 +25,7 @@ data:
   negative_sample_prob: 0.10869016106810858
   non_sky_bias: 0.5
   num_workers:
-    train: 12
+    train: 15
     val: 6
   batch_size:
     train: 8
