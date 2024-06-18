@@ -58,7 +58,6 @@ class HyperparameterOptimizationCallback(Callback):
     def on_tell_end(self, smbo: SMBO, info: TrialInfo, value: TrialValue):
         self._current_trial += 1
 
-        # Check for forbidden configuration trial results
         trial_result = [1 - cost for cost in value.cost]
 
         # Log trial configuration
