@@ -29,7 +29,7 @@ data:
     val: 6
   batch_size:
     train: 8
-    val: 6
+    val: 2
   cv:
     num_folds: 5
     fold: null
