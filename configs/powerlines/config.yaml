@@ -1,4 +1,4 @@
-name: pidnet-cables-and-poles-default-hp
+name: pidnet-cables-and-poles-v1
 cv_name: null
 
 epochs: 30
@@ -6,13 +6,13 @@ optimized_metrics:
   - cables/quality
   - poles/quality
 verbose: false
-minimal_logging: true
+minimal_logging: false
 
 data:
   augmentations:
     color_jitter:
       enabled: true
-      magnitude: 0.25880605005129625
+      magnitude: 0.038364487119429296
     flip:
       enabled: true
     multi_scale:
@@ -21,8 +21,8 @@ data:
 
   downsampling_factor: 16
   patch_size: 1024
-  perturbation: 473
-  negative_sample_prob: 0.10869016106810858
+  perturbation: 587
+  negative_sample_prob: 0.02850794761689004
   non_sky_bias: 0.5
   num_workers:
     train: 15
@@ -40,9 +40,9 @@ data:
     val: null
 
 loss:
-  poles_weight: 1.0
+  poles_weight: 1.377118238359857
   ohem:
-    enabled: false
+    enabled: true
     threshold: 0.9
     keep_fraction: 0.125
 
@@ -62,7 +62,7 @@ validation:
   last: false
 
 checkpointing:
-  enabled: false
+  enabled: true
 
 visualization:
   n_images_per_epoch: 0
