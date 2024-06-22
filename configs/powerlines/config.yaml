@@ -54,7 +54,7 @@ optimizer:
 
 paths:
   complete_frames: /scratch/cvlab/home/gwizdala/dataset/processed/daedalean/complete_frames
-  annotations: /scratch/cvlab/home/gwizdala/dataset/daedalean/cable-annotations
+  annotations: /scratch/cvlab/home/gwizdala/dataset/daedalean/annotations
   checkpoints: /scratch/cvlab/home/gwizdala/output/checkpoints
 
 validation:
