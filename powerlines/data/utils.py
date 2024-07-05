@@ -233,20 +233,21 @@ def load_complete_frame(
     annotation: ImageAnnotations,
     data_source: DataSourceConfig,
     sampling: SamplingConfig,
-    loading: LoadingConfig
+    loading: LoadingConfig,
+    max_cells_away: int
 ) -> Dict[str, Any]:
     timestamp = annotation.frame_timestamp()
     frame_image = load_npy(data_source.input_filepath(timestamp))
     distance_masks = load_distance_masks(data_source, loading, timestamp)
-    labels_cables = load_processed_label_image(data_source.labels_folder / f"{timestamp}.png") if loading.labels else None
+    cables_distance_mask = distance_masks["distance_mask"]
     poles_distance_mask = distance_masks["poles_distance_mask"]
 
     return {
         "timestamp": timestamp,
         "image": frame_image,
-        "labels_cables": labels_cables,
-        "labels_poles": nevbw_labels_from_distance_mask(poles_distance_mask[0]),
-        "distance_mask": distance_masks["distance_mask"],
+        "labels_cables": nevbw_labels_from_distance_mask(cables_distance_mask[0], max_cells_away=max_cells_away),
+        "labels_poles": nevbw_labels_from_distance_mask(poles_distance_mask[0], max_cells_away=max_cells_away),
+        "distance_mask": cables_distance_mask,
         "poles_distance_mask": poles_distance_mask,
         "exclusion_zones_distance_mask": distance_masks["exclusion_zones_distance_mask"],
         **frame_parameters(annotation, sampling, distance_masks)

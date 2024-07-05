@@ -22,7 +22,8 @@ class TrainCablesDetectionDataset(BaseDataset):
         loading: LoadingConfig,
         sampling: SamplingConfig,
         num_frames: Optional[int] = None,
-        num_workers: int = 4
+        num_workers: int = 4,
+        max_cells_away: int = 2
     ):
         super().__init__(
             ignore_label=255,
@@ -40,10 +41,11 @@ class TrainCablesDetectionDataset(BaseDataset):
         self.annotations = load_annotations(data_source)
         self.num_frames = num_frames if num_frames is not None else len(self.filepaths)
 
-        # Data augmentations
+        # Data augmentations and sampling
         self.use_color_jitter = data_config.augmentations.color_jitter.enabled
         self.use_flipping = data_config.augmentations.flip.enabled
         self.use_multi_scale = data_config.augmentations.multi_scale.enabled
+        self.max_cells_away = max_cells_away
 
         magnitude = data_config.augmentations.color_jitter.magnitude
         self.color_jitter = transforms.ColorJitter(
@@ -85,7 +87,7 @@ class TrainCablesDetectionDataset(BaseDataset):
     def __getitem__(self, idx: int):
         frame_id = self.sampling.frame_idx_for_sample(idx)
         annotation = self.annotations[self.timestamps[frame_id]]
-        frame = load_complete_frame(annotation, self.data_source, self.sampling, self.loading)
+        frame = load_complete_frame(annotation, self.data_source, self.sampling, self.loading, self.max_cells_away)
 
         size = frame["image"].shape
         timestamp = frame["timestamp"]

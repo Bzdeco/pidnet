@@ -46,7 +46,8 @@ def train_dataset(config: DictConfig) -> Dataset:
         data_source=data_source(config, "train"),
         loading=loading(config),
         sampling=sampling(config),
-        num_frames=config.data.size.train
+        num_frames=config.data.size.train,
+        max_cells_away=config.data.max_cells_away
     )
 
 
@@ -56,7 +57,8 @@ def val_dataset(config: DictConfig) -> Dataset:
         data_source=data_source(config, "val"),
         loading=loading(config),
         sampling=sampling(config),
-        num_frames=config.data.size.val
+        num_frames=config.data.size.val,
+        max_cells_away=config.data.max_cells_away
     )
 
 

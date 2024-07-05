@@ -20,6 +20,7 @@ data:
       scale_factor: 15
 
   downsampling_factor: 16
+  max_cells_away: 2
   patch_size: 1024
   perturbation: 788
   negative_sample_prob: 0.1201110883482061

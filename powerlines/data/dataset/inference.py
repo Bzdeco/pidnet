@@ -16,7 +16,8 @@ class InferenceCablesDetectionDataset(BaseDataset):
         data_source: DataSourceConfig,
         loading: LoadingConfig,
         sampling: SamplingConfig,
-        num_frames: Optional[int] = None
+        num_frames: Optional[int] = None,
+        max_cells_away: int = 2
     ):
         super().__init__(
             ignore_label=255,
@@ -28,6 +29,7 @@ class InferenceCablesDetectionDataset(BaseDataset):
         self.data_source = data_source
         self.loading = loading
         self.sampling = sampling
+        self.max_cells_away = max_cells_away
 
         self.filepaths = load_filtered_filepaths(data_source)
         self.timestamps = list(map(lambda path: int(path.stem), self.filepaths))
@@ -43,7 +45,7 @@ class InferenceCablesDetectionDataset(BaseDataset):
 
     def __getitem__(self, frame_id: int):
         annotation = self.annotations[self.timestamps[frame_id]]
-        frame = load_complete_frame(annotation, self.data_source, self.sampling, self.loading)
+        frame = load_complete_frame(annotation, self.data_source, self.sampling, self.loading, self.max_cells_away)
         timestamp = frame["timestamp"]
         name = str(timestamp)
         size = frame["image"].shape
