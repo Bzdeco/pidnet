@@ -64,8 +64,8 @@ class TrainCablesDetectionDataset(BaseDataset):
             use_threads=True
         )
 
-        self.cables_class_weights = torch.FloatTensor(CABLES_WEIGHTS).cuda()
-        self.poles_class_weights = torch.FloatTensor(POLES_WEIGHTS).cuda()
+        self.cables_class_weights = torch.FloatTensor(CABLES_WEIGHTS[self.max_cells_away]).cuda()
+        self.poles_class_weights = torch.FloatTensor(POLES_WEIGHTS[self.max_cells_away]).cuda()
 
         self.sampling.configure_sampling(parameters)
         del parameters
