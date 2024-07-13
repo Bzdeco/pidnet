@@ -1,7 +1,7 @@
 name: pidnet-cables-and-poles-v2
 cv_name: null
 
-epochs: 30
+epochs: 50
 optimized_metrics:
   - cables/quality
   - poles/quality
