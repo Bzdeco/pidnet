@@ -1,7 +1,7 @@
 name: pidnet-cables-and-poles-default-hp
 cv_name: null
 
-epochs: 30
+epochs: 60
 optimized_metrics:
   - cables/quality
   - poles/quality
