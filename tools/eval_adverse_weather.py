@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import torch
-from tensorflow.python.ops import nn
+import torch.nn as nn
 from torch.utils.data import DataLoader
 
 import models
