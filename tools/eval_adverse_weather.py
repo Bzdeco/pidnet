@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 import models
 from configs import config
 from powerlines.data import seed
+from powerlines.data.utils import POLES_WEIGHTS, CABLES_WEIGHTS
 from tools import factory
 from tools.train import powerlines_config
 from utils.criterion import OhemCrossEntropy, CrossEntropy
@@ -40,6 +41,7 @@ def load_checkpoint(filepath: Path, model: nn.Module):
 
 def evaluate(folder: Path, downsampling_factor: int, distortion: Optional[str] = None, severity: int = 1):
     config_powerlines = powerlines_config()
+    config_powerlines.verbose = True
     config_powerlines.data.batch_size.val = 1
     config_powerlines.minimal_logging = False
     config_powerlines.optimized_metrics = [  # all metrics that we want to be reported
@@ -67,15 +69,14 @@ def evaluate(folder: Path, downsampling_factor: int, distortion: Optional[str] =
         fold_config.data.cv.fold = fold
 
         if distortion is not None:
-            fold_config.paths.complete_frames_root_folder = f"{config_powerlines.paths.complete_frames_root_folder}_{distortion}_{severity}"
+            fold_config.paths.complete_frames_root_folder = f"{fold_config.paths.complete_frames_root_folder}_{distortion}_{severity}"
 
         # Create data
-        train_dataset = factory.train_dataset(config_powerlines)
         val_dataloader = DataLoader(
-            factory.val_dataset(config_powerlines),
-            batch_size=config_powerlines.data.batch_size.val,
+            factory.val_dataset(fold_config),
+            batch_size=fold_config.data.batch_size.val,
             shuffle=False,
-            num_workers=config_powerlines.data.num_workers.val,
+            num_workers=fold_config.data.num_workers.val,
             pin_memory=False,
             persistent_workers=True,
             drop_last=False,
@@ -84,44 +85,44 @@ def evaluate(folder: Path, downsampling_factor: int, distortion: Optional[str] =
         )
 
         # Create and initialize model
-        ohem_config = config_powerlines.loss.ohem
+        ohem_config = fold_config.loss.ohem
         if ohem_config.enabled:
             print("Using OHEM in loss function")
-            min_kept = int(ohem_config.keep_fraction * (config_powerlines.data.patch_size ** 2))
+            min_kept = int(ohem_config.keep_fraction * (fold_config.data.patch_size ** 2))
             semantic_seg_criterion = {
                 "cables": OhemCrossEntropy(
                     ignore_label=config.TRAIN.IGNORE_LABEL,
                     thres=ohem_config.threshold,
                     min_kept=min_kept,
-                    weight=train_dataset.cables_class_weights
+                    weight=torch.FloatTensor(CABLES_WEIGHTS).cuda()
                 ),
                 "poles": OhemCrossEntropy(
                     ignore_label=config.TRAIN.IGNORE_LABEL,
                     thres=ohem_config.threshold,
                     min_kept=min_kept,
-                    weight=train_dataset.poles_class_weights
+                    weight=torch.FloatTensor(POLES_WEIGHTS).cuda()
                 )
             }
         else:
             semantic_seg_criterion = {
                 "cables": CrossEntropy(
                     ignore_label=config.TRAIN.IGNORE_LABEL,
-                    weight=train_dataset.cables_class_weights
+                    weight=torch.FloatTensor(CABLES_WEIGHTS).cuda()
                 ),
                 "poles": CrossEntropy(
                     ignore_label=config.TRAIN.IGNORE_LABEL,
-                    weight=train_dataset.poles_class_weights
+                    weight=torch.FloatTensor(POLES_WEIGHTS).cuda()
                 )
             }
         pidnet = models.pidnet.get_seg_model(config)  # creates a pretrained model by default
-        model = FullModel(pidnet, semantic_seg_criterion, poles_weight=config_powerlines.loss.poles_weight).cuda()
+        model = FullModel(pidnet, semantic_seg_criterion, poles_weight=fold_config.loss.poles_weight).cuda()
 
         checkpoint_filepath = folder / f"fold_{fold}.pt"
         model = load_checkpoint(checkpoint_filepath, model)
 
         # Evaluate each for with given number of repetitions (to take distortions randomness into account)
         with torch.no_grad():
-            metrics = validate(0, config, config_powerlines, {}, val_dataloader, model)
+            metrics = validate(fold_config, val_dataloader, model)
 
             for name, value in metrics.items():
                 metric_results[name].append(value)

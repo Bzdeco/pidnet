@@ -83,7 +83,7 @@ def train(
 
 
 def validate(
-    epoch: int, config, config_powerlines: DictConfig, run: Run, dataloader: DataLoader, model: nn.Module
+    config_powerlines: DictConfig, dataloader: DataLoader, model: nn.Module
 ) -> Dict[str, float]:
     model.eval()
     torch.cuda.empty_cache()
@@ -127,17 +127,11 @@ def validate(
 
             # vis_logger.visualize(epoch, images, vis_predictions, labels)
 
-    # Log loss metrics
-    run["metrics/val/loss/total"].append(loss_meter["total"].average(), step=epoch)
-    run["metrics/val/loss/cables"].append(loss_meter["cables"].average(), step=epoch)
-    run["metrics/val/loss/poles"].append(loss_meter["poles"].average(), step=epoch)
-
     # Log segmentation metrics
     all_metrics = {}
     for entity, seg_metric in seg_metrics.items():
         metrics = seg_metric.compute()
         for name, value in metrics.items():
-            run[f"metrics/val/{entity}/{name}"].append(value, step=epoch)
             all_metrics[f"{entity}/{name}"] = value
 
     return {metric_name: all_metrics[metric_name] for metric_name in config_powerlines.optimized_metrics}
