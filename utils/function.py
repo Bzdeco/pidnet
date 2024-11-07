@@ -93,7 +93,7 @@ def validate(
         "cables": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging, mask_exclusion_zones=False),
         "poles": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging, mask_exclusion_zones=True)
     }
-    vis_logger = VisualizationLogger(run, config_powerlines)
+    # vis_logger = VisualizationLogger(run, config_powerlines)
 
     with torch.no_grad():
         iterator = tqdm(dataloader, desc="Validating") if config_powerlines.verbose else dataloader
@@ -125,7 +125,7 @@ def validate(
                 loss_meter[entity].update(loss_value.mean().item())
             loss_meter["total"].update(total_loss.mean().item())
 
-            vis_logger.visualize(epoch, images, vis_predictions, labels)
+            # vis_logger.visualize(epoch, images, vis_predictions, labels)
 
     # Log loss metrics
     run["metrics/val/loss/total"].append(loss_meter["total"].average(), step=epoch)
