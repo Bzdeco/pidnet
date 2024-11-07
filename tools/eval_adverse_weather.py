@@ -69,7 +69,7 @@ def evaluate(folder: Path, downsampling_factor: int, distortion: Optional[str] =
         fold_config.data.cv.fold = fold
 
         if distortion is not None:
-            fold_config.paths.complete_frames_root_folder = f"{fold_config.paths.complete_frames_root_folder}_{distortion}_{severity}"
+            fold_config.paths.complete_frames = f"{fold_config.paths.complete_frames}_{distortion}_{severity}"
 
         # Create data
         val_dataloader = DataLoader(
