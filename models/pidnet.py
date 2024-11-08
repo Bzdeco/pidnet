@@ -85,13 +85,13 @@ class PIDNet(nn.Module):
         
         # Prediction head, downsampling to common resolution with the scale factor
         if self.augment:
-            self.seghead_p_cables = segmenthead(planes * 2, head_planes, 2, scale_factor=0.5)
-            self.seghead_p_poles = segmenthead(planes * 2, head_planes, 2, scale_factor=0.5)
-            self.seghead_d_cables = segmenthead(planes * 2, planes, 1, scale_factor=0.5)
-            self.seghead_d_poles = segmenthead(planes * 2, planes, 1, scale_factor=0.5)
+            self.seghead_p_cables = segmenthead(planes * 2, head_planes, 2, scale_factor=0.25)
+            self.seghead_p_poles = segmenthead(planes * 2, head_planes, 2, scale_factor=0.25)
+            self.seghead_d_cables = segmenthead(planes * 2, planes, 1, scale_factor=0.25)
+            self.seghead_d_poles = segmenthead(planes * 2, planes, 1, scale_factor=0.25)
 
-        self.final_layer_cables = segmenthead(planes * 4, head_planes, 2, scale_factor=0.5)
-        self.final_layer_poles = segmenthead(planes * 4, head_planes, 2, scale_factor=0.5)
+        self.final_layer_cables = segmenthead(planes * 4, head_planes, 2, scale_factor=0.25)
+        self.final_layer_poles = segmenthead(planes * 4, head_planes, 2, scale_factor=0.25)
 
         # Layers initialization
         for m in self.modules():

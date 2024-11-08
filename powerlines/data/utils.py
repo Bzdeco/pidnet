@@ -319,7 +319,7 @@ def cut_into_complete_set_of_patches(
     return patches, shifts
 
 
-_downsampler = nn.MaxPool2d(kernel_size=2, stride=2).cuda()
+_downsampler = nn.MaxPool2d(kernel_size=2, stride=2)
 
 
 def downsample_labels(labels: torch.Tensor, grid_size: int, adjust_to_divisible: bool) -> torch.Tensor:

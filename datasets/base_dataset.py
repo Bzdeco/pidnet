@@ -7,8 +7,11 @@ import cv2
 import numpy as np
 import random
 
+import torch
 from torch.nn import functional as F
 from torch.utils import data
+
+from powerlines.data.utils import downsample_labels
 
 y_k_size = 6
 x_k_size = 6
@@ -64,7 +67,9 @@ class BaseDataset(data.Dataset):
 
     def label_transform(self, labels):
         return {
-            entity: np.array(label).astype(np.uint8)
+            entity: downsample_labels(
+                torch.as_tensor(label).unsqueeze(0).float(), grid_size=32, adjust_to_divisible=False
+            ).squeeze().long()
             for entity, label in labels.items()
         }
 

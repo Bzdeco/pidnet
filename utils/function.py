@@ -47,8 +47,8 @@ def train(
     for i_iter, batch in enumerate(iterator):
         images = batch["image"].cuda()
         labels = {
-            "cables": downsample_labels(batch["labels_cables"].cuda().float(), grid_size=16, adjust_to_divisible=False).long(),
-            "poles": downsample_labels(batch["labels_poles"].cuda().float(), grid_size=16, adjust_to_divisible=False).long()
+            "cables": batch["labels_cables"].cuda().long(),
+            "poles": batch["labels_poles"].cuda().long()
         }
 
         with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=True, cache_enabled=True):
@@ -101,12 +101,8 @@ def validate(
             images = batch["image"].cuda()
             timestamps = batch["timestamp"]
             labels = {
-                "cables": downsample_labels(
-                    batch["labels_cables"].cuda().float(), grid_size=16, adjust_to_divisible=False
-                ).long(),
-                "poles": downsample_labels(
-                    batch["labels_poles"].cuda().float(), grid_size=16, adjust_to_divisible=False
-                ).long()
+                "cables": batch["labels_cables"].cuda().long(),
+                "poles": batch["labels_poles"].cuda().long()
             }
 
             # Inference
