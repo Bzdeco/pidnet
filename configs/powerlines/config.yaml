@@ -16,16 +16,16 @@ data:
     flip:
       enabled: true
     multi_scale:
-      enabled: false
+      enabled: true
       scale_factor: 15
 
-  downsampling_factor: 16
+  downsampling_factor: 32
   patch_size: 1024
-  perturbation: 473
-  negative_sample_prob: 0.10869016106810858
+  perturbation: 788
+  negative_sample_prob: 0.1201110883482061
   non_sky_bias: 0.5
   num_workers:
-    train: 15
+    train: 20
     val: 6
   batch_size:
     train: 8
@@ -40,11 +40,11 @@ data:
     val: null
 
 loss:
-  poles_weight: 1.0
+  poles_weight: 3.5784599991763812
   ohem:
     enabled: true
-    threshold: 0.9
-    keep_fraction: 0.125
+    threshold: 0.5
+    keep_fraction: 0.375
 
 optimizer:
   name: adam

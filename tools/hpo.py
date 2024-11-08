@@ -36,16 +36,15 @@ def overrides_from_trial_config(hpo_run_id: int, trial_id: int) -> List[str]:
     hyperparameters = hpo_run[f"trials/{trial_id}"].fetch()
     return [
         f"data.augmentations.color_jitter.magnitude={hyperparameters['color_jitter_magnitude']}",
-        # f"data.augmentations.multi_scale.enabled={hyperparameters['multi_scale_enabled']}",
+        f"data.augmentations.multi_scale.scale_factor={hyperparameters['multi_scale_factor']}",
         f"data.perturbation={perturbation_from_hyperparameters(hyperparameters)}",
         f"data.negative_sample_prob={hyperparameters['negative_sample_prob']}",
-        # f"data.batch_size.train={hyperparameters['batch_size']}",
-        # f"loss.ohem.enabled={hyperparameters['ohem_enabled']}",
+        f"data.batch_size.train={hyperparameters['batch_size']}",
         f"loss.ohem.threshold={hyperparameters['ohem_threshold']}",
         f"loss.ohem.keep_fraction={hyperparameters['ohem_keep_fraction']}",
         f"loss.poles_weight={hyperparameters['poles_weight']}",
-        # f"optimizer.lr={hyperparameters['lr']}",
-        # f"optimizer.wd={hyperparameters['wd']}"
+        f"optimizer.lr={hyperparameters['lr']}",
+        f"optimizer.wd={hyperparameters['wd']}"
     ]
 
 
@@ -54,16 +53,15 @@ def overrides_from_hpc(
 ) -> List[str]:
     return [
         f"data.augmentations.color_jitter.magnitude={config['color_jitter_magnitude']}",
-        # f"data.augmentations.multi_scale.enabled={config['multi_scale_enabled']}",
+        f"data.augmentations.multi_scale.scale_factor={config['multi_scale_factor']}",
         f"data.perturbation={perturbation_from_hyperparameters(config)}",
         f"data.negative_sample_prob={config['negative_sample_prob']}",
-        # f"data.batch_size.train={config['batch_size']}",
-        # f"loss.ohem.enabled={config['ohem_enabled']}",
+        f"data.batch_size.train={config['batch_size']}",
         f"loss.ohem.threshold={config['ohem_threshold']}",
         f"loss.ohem.keep_fraction={config['ohem_keep_fraction']}",
         f"loss.poles_weight={config['poles_weight']}",
-        # f"optimizer.lr={config['lr']}",
-        # f"optimizer.wd={config['wd']}",
+        f"optimizer.lr={config['lr']}",
+        f"optimizer.wd={config['wd']}",
         f"epochs={epochs}"
     ]
 
@@ -81,16 +79,16 @@ class HPORunner:
         config_space = ConfigurationSpace()
 
         config_space.add_hyperparameters([
-            Float("color_jitter_magnitude", (0.0, 0.5), default=0.2),
-            # Categorical("multi_scale_enabled", [False, True], default=True),
-            Float("perturbation_fraction", (0.0, 0.875), default=0.375),
-            Float("negative_sample_prob", (0.0, 0.25), default=0.12),
-            # Integer("batch_size", (2, 64), default=12, log=True),
-            Float("ohem_threshold", (0.0, 1.0), default=0.9, q=0.1),
-            Float("ohem_keep_fraction", (0.0, 1.0), default=0.125, q=0.125),
-            # Float("lr", (1e-5, 1e-2), default=1e-2, log=True),
-            # Float("wd", (1e-6, 1e-1), default=5e-4, log=True),
-            Float("poles_weight", (0.25, 4.0), default=1.0)
+            Float("color_jitter_magnitude", (0.0, 0.5), default=0.25880605005129625),
+            Categorical("multi_scale_factor", [0, 5, 10, 15], ordered=True, default=0),
+            Float("perturbation_fraction", (0.0, 0.875), default=0.76953125),
+            Float("negative_sample_prob", (0.0, 0.25), default=0.1201110883482061),
+            Integer("batch_size", (2, 32), default=8, log=True),
+            Float("ohem_threshold", (0.0, 1.0), default=0.5),
+            Float("ohem_keep_fraction", (0.0, 1.0), default=0.375),
+            Float("lr", (1e-5, 1e-2), default=0.00026546297924107056, log=True),
+            Float("wd", (1e-6, 1e-1), default=0.00003328371707969199, log=True),
+            Float("poles_weight", (0.25, 4.0), default=3.5784599991763812)
         ])
 
         return config_space

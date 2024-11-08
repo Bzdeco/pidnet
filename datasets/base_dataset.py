@@ -39,8 +39,8 @@ class BaseDataset(data.Dataset):
     def __init__(
         self,
         ignore_label=255,
-        base_size=2048,
-        crop_size=(512, 1024),
+        base_size=1024,
+        crop_size=(1024, 1024),
         scale_factor=16
     ):
         self.base_size = base_size
@@ -69,7 +69,7 @@ class BaseDataset(data.Dataset):
         return {
             entity: downsample_labels(
                 torch.as_tensor(label).unsqueeze(0).float(), grid_size=32, adjust_to_divisible=False
-            ).squeeze().long()
+            ).squeeze().numpy()
             for entity, label in labels.items()
         }
 
@@ -142,8 +142,12 @@ class BaseDataset(data.Dataset):
         image = channel_last(image)
 
         if use_multi_scale:
-            rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
-            image, labels, edge = self.multi_scale_aug(image, labels, edge, rand_scale=rand_scale)
+            additional_scale = np.clip(
+                random.choice([-1, 1]) * random.randint(0, self.scale_factor) / 10.0,
+                a_min=-0.5, a_max=self.scale_factor / 10.0
+            )
+            rand_scale = 1.0 + additional_scale
+            image, labels, edge = self.multi_scale_aug(image, labels, edge, rand_scale=rand_scale, rand_crop=False)
 
         image = channel_first(self.input_transform(image))
         labels = self.label_transform(labels)
