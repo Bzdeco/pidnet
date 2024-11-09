@@ -49,8 +49,10 @@ def undo_image_preprocessing(image: torch.Tensor) -> torch.Tensor:
 
 def _pred_target_vis(prediction: torch.Tensor, target: torch.Tensor, downsampling_factor: int) -> torch.Tensor:
     pred_vis = pad_to(upsample(segmentation_as_image(prediction.detach().cpu().float()), downsampling_factor), (3000, 4096))
+    # pred_vis = upsample(segmentation_as_image(prediction.detach().cpu().float()), downsampling_factor)
     target_vis = pad_to(upsample(segmentation_as_image(target.detach().cpu().float()), downsampling_factor), (3000, 4096))
-    return torch.concatenate((pred_vis, target_vis), dim=1)
+    # target_vis = upsample(segmentation_as_image(target.detach().cpu().float()), downsampling_factor)
+    return torch.cat((pred_vis, target_vis), dim=1)
 
 
 def visualize_joint_detection(
@@ -64,8 +66,9 @@ def visualize_joint_detection(
     image_vis = undo_image_preprocessing(image.detach().cpu()).permute((1, 2, 0)).int()
     cables_vis = _pred_target_vis(pred_cables, target_cables, downsampling_factor)
     poles_vis = _pred_target_vis(pred_poles, target_poles, downsampling_factor)
-    stacked_vis = torch.concatenate((image_vis, cables_vis, poles_vis))
+    stacked_vis = torch.cat((image_vis, cables_vis, poles_vis), dim=1)
 
+    # width, height = 1024 * 5, 750
     width, height = 1024 * 3, 750
     pil_image = torchvision.transforms.functional.to_pil_image(stacked_vis.permute((2, 0, 1)) / 255, mode="RGB")
     return pil_image.resize((width, height))

@@ -77,9 +77,11 @@ class BaseDataset(data.Dataset):
         pad_image = image.copy()
         pad_h = max(size[0] - h, 0)
         pad_w = max(size[1] - w, 0)
+        top, left = pad_h // 2, pad_w // 2
+        bottom, right = pad_h - top, pad_w - left
         if pad_h > 0 or pad_w > 0:
             pad_image = cv2.copyMakeBorder(
-                image.astype(float), 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=padvalue
+                image.astype(float), top, bottom, left, right, cv2.BORDER_CONSTANT, value=padvalue
             ).astype(image.dtype)
 
         return pad_image
@@ -144,10 +146,10 @@ class BaseDataset(data.Dataset):
         if use_multi_scale:
             additional_scale = np.clip(
                 random.choice([-1, 1]) * random.randint(0, self.scale_factor) / 10.0,
-                a_min=-0.5, a_max=self.scale_factor / 10.0
+                a_min=-0.5 if self.scale_factor > 0 else 0.0, a_max=self.scale_factor / 10.0
             )
             rand_scale = 1.0 + additional_scale
-            image, labels, edge = self.multi_scale_aug(image, labels, edge, rand_scale=rand_scale, rand_crop=False)
+            image, labels, edge = self.multi_scale_aug(image, labels, edge, rand_scale=rand_scale)
 
         image = channel_first(self.input_transform(image))
         labels = self.label_transform(labels)

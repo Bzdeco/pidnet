@@ -43,6 +43,8 @@ def train(
     accuracy_meters = {"cables": AverageMeter(), "poles": AverageMeter()}
     cur_iters = epoch * epoch_iters
 
+    # vis_logger = VisualizationLogger(run, config_powerlines)
+
     iterator = tqdm(dataloader, desc="Training") if config_powerlines.verbose else dataloader
     for i_iter, batch in enumerate(iterator):
         images = batch["image"].cuda()
@@ -69,6 +71,12 @@ def train(
         for entity, acc in accuracies.items():
             accuracy_meters[entity].update(acc.item())
 
+        # vis_predictions = {}
+        # for entity in ["cables", "poles"]:
+        #     seg_predictions = predictions[entity]["main"]
+        #     vis_predictions[entity] = seg_predictions
+        # vis_logger.visualize(epoch, images, vis_predictions, labels)
+
         optimizer_config = config_powerlines.optimizer
         if optimizer_config.adjust_lr:
             adjust_learning_rate(optimizer, optimizer_config.lr, num_iters, i_iter + cur_iters)
@@ -93,7 +101,7 @@ def validate(
         "cables": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging, mask_exclusion_zones=False),
         "poles": segmentation_metrics(minimal_logging=config_powerlines.minimal_logging, mask_exclusion_zones=True)
     }
-    vis_logger = VisualizationLogger(run, config_powerlines)
+    # vis_logger = VisualizationLogger(run, config_powerlines)
 
     with torch.no_grad():
         iterator = tqdm(dataloader, desc="Validating") if config_powerlines.verbose else dataloader
@@ -121,7 +129,7 @@ def validate(
                 loss_meter[entity].update(loss_value.mean().item())
             loss_meter["total"].update(total_loss.mean().item())
 
-            vis_logger.visualize(epoch, images, vis_predictions, labels)
+            # vis_logger.visualize(epoch, images, vis_predictions, labels)
 
     # Log loss metrics
     run["metrics/val/loss/total"].append(loss_meter["total"].average(), step=epoch)
