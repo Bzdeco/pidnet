@@ -1,5 +1,5 @@
-name: pidnet-cp-32-fold-x
-cv_name: pidnet-cp-32
+name: pidnet-cp-32-same-params
+cv_name: pidnet-cp-32-same-params
 
 epochs: 50
 optimized_metrics:
@@ -25,7 +25,7 @@ data:
   negative_sample_prob: 0.1201110883482061
   non_sky_bias: 0.5
   num_workers:
-    train: 15
+    train: 20
     val: 6
   batch_size:
     train: 8
