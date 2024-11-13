@@ -1,12 +1,12 @@
-name: pidnet-cables-and-poles-default-hp
-cv_name: null
+name: pidnet-cp-32-fold-x
+cv_name: pidnet-cp-32
 
-epochs: 30
+epochs: 50
 optimized_metrics:
   - cables/quality
   - poles/quality
 verbose: false
-minimal_logging: true
+minimal_logging: false
 
 data:
   augmentations:
@@ -16,8 +16,8 @@ data:
     flip:
       enabled: true
     multi_scale:
-      enabled: true
-      scale_factor: 15
+      enabled: false
+      scale_factor: 0
 
   downsampling_factor: 32
   patch_size: 1024
@@ -25,7 +25,7 @@ data:
   negative_sample_prob: 0.1201110883482061
   non_sky_bias: 0.5
   num_workers:
-    train: 20
+    train: 15
     val: 6
   batch_size:
     train: 8
