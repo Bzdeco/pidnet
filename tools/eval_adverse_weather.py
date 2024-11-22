@@ -19,13 +19,19 @@ from utils.function import validate
 from utils.utils import FullModel
 
 
-def cross_validation_metrics(metrics: Dict[str, List[float]]):
+def cross_validation_metrics(metrics: Dict[str, List[float]], fold_sizes: List[int]):
     aggregated_metrics = {}
+    w = np.asarray(fold_sizes)
     for name, values in metrics.items():
-        values_npy = np.asarray(values)
+        x = np.asarray(values)
+        mean_w = (x * w) / w.sum()
+        m = np.count_nonzero(w)
         aggregated_metrics[name] = {
-            "mean": np.mean(values_npy),
-            "std": np.std(values_npy)
+            "mean": mean_w,
+            "std": np.sqrt(
+                (w * ((x - mean_w) ** 2)).sum() /
+                (((m - 1) / m) * w.sum())
+            )
         }
     return aggregated_metrics
 
@@ -61,6 +67,7 @@ def evaluate(folder: Path, downsampling_factor: int, distortion: Optional[str] =
     num_folds = 5
 
     metric_results = defaultdict(list)
+    fold_sizes = []
 
     # Validation dataset
     for fold in range(num_folds):
@@ -72,8 +79,9 @@ def evaluate(folder: Path, downsampling_factor: int, distortion: Optional[str] =
             fold_config.paths.complete_frames = f"{fold_config.paths.complete_frames}_{distortion}_{severity}"
 
         # Create data
+        val_dataset = factory.val_dataset(fold_config)
         val_dataloader = DataLoader(
-            factory.val_dataset(fold_config),
+            val_dataset,
             batch_size=fold_config.data.batch_size.val,
             shuffle=False,
             num_workers=fold_config.data.num_workers.val,
@@ -127,7 +135,9 @@ def evaluate(folder: Path, downsampling_factor: int, distortion: Optional[str] =
             for name, value in metrics.items():
                 metric_results[name].append(value)
 
-    return cross_validation_metrics(metric_results)
+        fold_sizes.append(len(val_dataset))
+
+    return cross_validation_metrics(metric_results, fold_sizes)
 
 
 if __name__ == '__main__':
