@@ -24,7 +24,7 @@ def cross_validation_metrics(metrics: Dict[str, List[float]], fold_sizes: List[i
     w = np.asarray(fold_sizes)
     for name, values in metrics.items():
         x = np.asarray(values)
-        mean_w = (x * w) / w.sum()
+        mean_w = (x * w).sum() / w.sum()
         m = np.count_nonzero(w)
         aggregated_metrics[name] = {
             "mean": mean_w,
